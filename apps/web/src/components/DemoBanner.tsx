@@ -379,8 +379,8 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({
                     <label className="block text-xs font-bold text-slate-200">
                       Masukkan PIN Otorisasi:
                     </label>
-                    <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
-                      Default: 8899 atau azgo2026
+                    <span className="text-[10px] text-amber-400/90 bg-amber-950/40 border border-amber-800/40 px-2.5 py-0.5 rounded-full font-semibold">
+                      🔒 Khusus Manajemen AzGo
                     </span>
                   </div>
 
