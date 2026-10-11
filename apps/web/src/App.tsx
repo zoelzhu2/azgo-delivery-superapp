@@ -78,7 +78,10 @@ export const App: React.FC = () => {
   );
 
   // Mode Aplikasi: Demo vs Real (Live)
+  // Jika VITE_APP_MODE='production', fitur demo dinonaktifkan total untuk link live operasional
+  const isProductionDeployment = (import.meta as any).env?.VITE_APP_MODE === 'production';
   const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
+    if (isProductionDeployment) return false;
     const saved = localStorage.getItem('azgo_demo_mode');
     return saved !== null ? saved === 'true' : true;
   });
@@ -293,13 +296,15 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      <DemoBanner
-        isDemoMode={isDemoMode}
-        onToggleDemoMode={handleToggleDemoMode}
-        onQuickLogin={handleQuickLogin}
-        onResetDemoData={handleResetDemoData}
-        currentUser={currentUser}
-      />
+      {!isProductionDeployment && (
+        <DemoBanner
+          isDemoMode={isDemoMode}
+          onToggleDemoMode={handleToggleDemoMode}
+          onQuickLogin={handleQuickLogin}
+          onResetDemoData={handleResetDemoData}
+          currentUser={currentUser}
+        />
+      )}
 
       <Navbar
         activeTab={activeTab}
@@ -307,7 +312,7 @@ export const App: React.FC = () => {
         onQuickTrack={handleQuickTrack}
         currentUser={currentUser}
         canTrack={canTrack}
-        isDemoMode={isDemoMode}
+        isDemoMode={!isProductionDeployment && isDemoMode}
         onLoginClick={() => {
           setLoginTargetMessage('');
           setShowLoginModal(true);
