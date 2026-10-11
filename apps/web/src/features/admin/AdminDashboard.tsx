@@ -33,7 +33,10 @@ import {
   Bike,
   Layers,
   Power,
-  Ban
+  Ban,
+  QrCode,
+  Upload,
+  Trash2
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -51,7 +54,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onChangePassword,
   onServicesUpdated
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'pricing' | 'drivers' | 'merchants' | 'hubs' | 'users' | 'partners' | 'finance' | 'services'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'pricing' | 'drivers' | 'merchants' | 'hubs' | 'users' | 'partners' | 'finance' | 'services' | 'qris'>('orders');
   const [metrics, setMetrics] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [serviceFilter, setServiceFilter] = useState('ALL');
@@ -61,6 +64,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [hubs, setHubs] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [saveSuccess, setSaveSuccess] = useState('');
+
+  // QRIS Payment Settings State
+  const [qrisMerchantName, setQrisMerchantName] = useState('AZ GO INDONESIA');
+  const [qrisNmid, setQrisNmid] = useState('ID1029384756209');
+  const [qrisBankName, setQrisBankName] = useState('BCA / GoPay Merchant');
+  const [qrisInstructions, setQrisInstructions] = useState('Pastikan nama penerima bertuliskan AZ GO. Setelah transfer, simpan bukti dan upload pada form pemesanan.');
+  const [qrisImageUrl, setQrisImageUrl] = useState<string>('');
+  const [qrisImageName, setQrisImageName] = useState<string>('');
+  const [qrisSaveSuccess, setQrisSaveSuccess] = useState('');
 
   // Partner Applications State
   const [partnerApplications, setPartnerApplications] = useState<PartnerApplication[]>([]);
@@ -163,6 +175,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     loadData();
   }, [serviceFilter]);
+
+  useEffect(() => {
+    try {
+      const savedQris = localStorage.getItem('azgo_qris_config');
+      if (savedQris) {
+        const parsed = JSON.parse(savedQris);
+        if (parsed.merchantName) setQrisMerchantName(parsed.merchantName);
+        if (parsed.nmid) setQrisNmid(parsed.nmid);
+        if (parsed.bankName) setQrisBankName(parsed.bankName);
+        if (parsed.instructions) setQrisInstructions(parsed.instructions);
+        if (parsed.imageUrl) setQrisImageUrl(parsed.imageUrl);
+      }
+    } catch {}
+  }, []);
+
+  const handleUploadQrisImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran file barcode QRIS maksimal 5 MB.');
+      return;
+    }
+    setQrisImageName(file.name);
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      setQrisImageUrl(uploadEvent.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveQrisConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    const config = {
+      merchantName: qrisMerchantName.trim(),
+      nmid: qrisNmid.trim(),
+      bankName: qrisBankName.trim(),
+      instructions: qrisInstructions.trim(),
+      imageUrl: qrisImageUrl,
+      updatedAt: new Date().toISOString()
+    };
+    localStorage.setItem('azgo_qris_config', JSON.stringify(config));
+    setQrisSaveSuccess('✅ Barcode QRIS & pengaturan pembayaran berhasil disimpan! Langsung aktif di seluruh checkout pelanggan.');
+    setTimeout(() => setQrisSaveSuccess(''), 6000);
+  };
+
+  const handleResetQrisImage = () => {
+    setQrisImageUrl('');
+    setQrisImageName('');
+  };
 
   // Toggle Handlers
   const handleToggleDriver = async (driverId: string) => {
@@ -660,6 +721,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <Layers className="w-4 h-4 text-blue-400" /> Kontrol Layanan AZ GO ({services.filter(s => s.isActive !== false).length}/{services.length || 7})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('qris')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            activeTab === 'qris' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <QrCode className="w-4 h-4 text-rose-400" /> Barcode QRIS & Pembayaran
         </button>
       </div>
 
@@ -1680,6 +1750,193 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ================= TAB 10: PENGATURAN BARCODE QRIS & PEMBAYARAN ================= */}
+      {activeTab === 'qris' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                    <QrCode className="w-4 h-4" />
+                  </span>
+                  <h3 className="font-extrabold text-slate-900 text-lg">Pengaturan Barcode QRIS & Rekening Resmi</h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+                  Unggah gambar barcode QRIS resmi usaha Anda (BCA, Mandiri, BRI, Nobu, atau GoPay Merchant) agar otomatis tampil kepada seluruh pelanggan saat memilih metode bayar QRIS.
+                </p>
+              </div>
+
+              {qrisSaveSuccess && (
+                <div className="px-3.5 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold animate-in fade-in flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  {qrisSaveSuccess}
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveQrisConfig} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* Kolom Kiri: Form Informasi Merchant & Rekening */}
+              <div className="lg:col-span-7 space-y-4 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Nama Toko / Perusahaan Penerima (Merchant Name) <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: AZ GO INDONESIA / PT AZ GO LOGISTIK"
+                    value={qrisMerchantName}
+                    onChange={e => setQrisMerchantName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-bold text-sm focus:outline-rose-500"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Nama ini yang akan muncul di struk elektronik dan di bawah kode QR pada HP pelanggan.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Nomor NMID (National Merchant ID)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: ID1029384756209"
+                      value={qrisNmid}
+                      onChange={e => setQrisNmid(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-xs focus:outline-rose-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Bank Penerbit / Merchant Aggregator
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: BCA / Mandiri / GoPay"
+                      value={qrisBankName}
+                      onChange={e => setQrisBankName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-rose-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Petunjuk Pembayaran Tambahan (Opsional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Contoh: Pastikan nama penerima bertuliskan AZ GO. Setelah pembayaran berhasil, simpan bukti transfer dan unggah pada aplikasi."
+                    value={qrisInstructions}
+                    onChange={e => setQrisInstructions(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs leading-relaxed focus:outline-rose-500"
+                  />
+                </div>
+
+                {/* Upload Gambar Barcode QRIS Asli */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                        <Upload className="w-3.5 h-3.5 text-rose-600" />
+                        Unggah Gambar Barcode QRIS Asli Anda
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Format: JPG, PNG, atau WEBP (Maksimal 5 MB).
+                      </p>
+                    </div>
+
+                    {qrisImageUrl && (
+                      <button
+                        type="button"
+                        onClick={handleResetQrisImage}
+                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold border border-rose-200 transition flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" /> Hapus Gambar
+                      </button>
+                    )}
+                  </div>
+
+                  <label className="border-2 border-dashed border-slate-300 hover:border-rose-500 bg-white hover:bg-rose-50/20 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition text-center group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadQrisImage}
+                      className="hidden"
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 group-hover:scale-110 flex items-center justify-center transition mb-2">
+                      <QrCode className="w-5 h-5" />
+                    </div>
+                    <span className="font-bold text-slate-700 text-xs group-hover:text-rose-600 transition">
+                      {qrisImageName ? `Berkas Terpilih: ${qrisImageName}` : 'Klik untuk Pilih File Foto Barcode QRIS'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">
+                      Screenshot QRIS dari BCA Bisnis / GoBiz / Mandiri / dll.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2"
+                  >
+                    <Save className="w-4 h-4" /> Simpan Pengaturan QRIS
+                  </button>
+                </div>
+              </div>
+
+              {/* Kolom Kanan: Live Preview Tampilan di HP Pelanggan */}
+              <div className="lg:col-span-5 bg-slate-100 p-5 rounded-3xl border border-slate-200 flex flex-col items-center justify-center space-y-3">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block text-center">
+                  📱 Tampilan di Layar Pelanggan Saat Checkout
+                </span>
+
+                <div className="bg-white rounded-2xl p-4 shadow-md border border-slate-200 w-full max-w-[280px] text-center space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-black text-[11px] text-slate-800">QRIS STANDAR BI</span>
+                    <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Resmi</span>
+                  </div>
+
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-center min-h-[180px]">
+                    {qrisImageUrl ? (
+                      <img
+                        src={qrisImageUrl}
+                        alt="Preview QRIS"
+                        className="w-44 h-auto max-h-56 object-contain mx-auto rounded-lg shadow-sm"
+                      />
+                    ) : (
+                      <div className="text-center p-3 space-y-1">
+                        <QrCode className="w-16 h-16 text-slate-400 mx-auto" />
+                        <p className="text-[11px] font-bold text-slate-500">Template Mockup Bawaan</p>
+                        <p className="text-[9px] text-slate-400">(Belum ada gambar QRIS kustom)</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-left text-[11px] space-y-0.5 border-t border-slate-100 pt-2">
+                    <p className="font-extrabold text-slate-900 truncate">{qrisMerchantName || 'AZ GO INDONESIA'}</p>
+                    <p className="text-[10px] font-mono text-slate-500">NMID: {qrisNmid || 'ID1029384756209'}</p>
+                    {qrisBankName && (
+                      <p className="text-[10px] text-slate-600 font-medium">Bank/Mitra: {qrisBankName}</p>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 text-center max-w-xs">
+                  Barcode di atas adalah yang akan di-scan oleh kamera GoPay, OVO, BCA, DANA, atau ShopeePay pelanggan.
+                </p>
+              </div>
+
+            </form>
           </div>
         </div>
       )}

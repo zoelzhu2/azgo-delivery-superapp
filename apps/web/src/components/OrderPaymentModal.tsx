@@ -63,6 +63,15 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
   const [proofError, setProofError] = useState<string>('');
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
 
+  // Ambil Konfigurasi QRIS yang diatur oleh Admin
+  const [qrisConfig] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('azgo_qris_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
+
   if (!isOpen) return null;
 
   const handleCopyNominal = () => {
@@ -344,68 +353,90 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
 
               {/* QR Code Frame */}
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 inline-block mx-auto relative group">
-                {/* Visual SVG QR Code Mockup */}
-                <svg
-                  className="w-48 h-48 mx-auto"
-                  viewBox="0 0 100 100"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  {/* Outer corner squares */}
-                  <rect width="100" height="100" fill="white" />
-                  {/* Top-left position marker */}
-                  <rect x="10" y="10" width="24" height="24" rx="4" fill="#0f172a" />
-                  <rect x="14" y="14" width="16" height="16" rx="2" fill="white" />
-                  <rect x="18" y="18" width="8" height="8" rx="1" fill="#0f172a" />
-                  {/* Top-right position marker */}
-                  <rect x="66" y="10" width="24" height="24" rx="4" fill="#0f172a" />
-                  <rect x="70" y="14" width="16" height="16" rx="2" fill="white" />
-                  <rect x="74" y="18" width="8" height="8" rx="1" fill="#0f172a" />
-                  {/* Bottom-left position marker */}
-                  <rect x="10" y="66" width="24" height="24" rx="4" fill="#0f172a" />
-                  <rect x="14" y="70" width="16" height="16" rx="2" fill="white" />
-                  <rect x="18" y="74" width="8" height="8" rx="1" fill="#0f172a" />
-                  {/* Data patterns (simulated QR matrices) */}
-                  <rect x="40" y="12" width="6" height="6" fill="#0f172a" />
-                  <rect x="52" y="12" width="6" height="6" fill="#0f172a" />
-                  <rect x="44" y="22" width="12" height="6" fill="#0f172a" />
-                  <rect x="40" y="32" width="6" height="12" fill="#0f172a" />
-                  <rect x="50" y="36" width="8" height="8" fill="#e11d48" />
-                  <rect x="12" y="42" width="6" height="6" fill="#0f172a" />
-                  <rect x="24" y="42" width="8" height="6" fill="#0f172a" />
-                  <rect x="66" y="40" width="10" height="6" fill="#0f172a" />
-                  <rect x="80" y="40" width="8" height="8" fill="#0f172a" />
-                  <rect x="70" y="52" width="6" height="14" fill="#0f172a" />
-                  <rect x="82" y="54" width="8" height="6" fill="#0f172a" />
-                  <rect x="40" y="52" width="6" height="6" fill="#0f172a" />
-                  <rect x="52" y="52" width="6" height="6" fill="#0f172a" />
-                  <rect x="44" y="64" width="14" height="6" fill="#0f172a" />
-                  <rect x="40" y="76" width="6" height="14" fill="#0f172a" />
-                  <rect x="52" y="76" width="8" height="6" fill="#0f172a" />
-                  <rect x="66" y="74" width="12" height="6" fill="#0f172a" />
-                  <rect x="82" y="74" width="8" height="16" fill="#0f172a" />
-                  <rect x="66" y="86" width="8" height="6" fill="#0f172a" />
-                </svg>
-
-                {/* Center Badge AZ GO */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="px-2 py-0.5 bg-rose-600 text-white rounded text-[10px] font-black shadow-md border-2 border-white">
-                    AZ GO
+                {qrisConfig?.imageUrl ? (
+                  <div className="max-w-[240px] mx-auto">
+                    <img
+                      src={qrisConfig.imageUrl}
+                      alt="Barcode QRIS Resmi"
+                      className="w-52 h-auto max-h-72 object-contain mx-auto rounded-xl border border-slate-100 shadow-sm"
+                    />
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Visual SVG QR Code Mockup */}
+                    <svg
+                      className="w-48 h-48 mx-auto"
+                      viewBox="0 0 100 100"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      {/* Outer corner squares */}
+                      <rect width="100" height="100" fill="white" />
+                      {/* Top-left position marker */}
+                      <rect x="10" y="10" width="24" height="24" rx="4" fill="#0f172a" />
+                      <rect x="14" y="14" width="16" height="16" rx="2" fill="white" />
+                      <rect x="18" y="18" width="8" height="8" rx="1" fill="#0f172a" />
+                      {/* Top-right position marker */}
+                      <rect x="66" y="10" width="24" height="24" rx="4" fill="#0f172a" />
+                      <rect x="70" y="14" width="16" height="16" rx="2" fill="white" />
+                      <rect x="74" y="18" width="8" height="8" rx="1" fill="#0f172a" />
+                      {/* Bottom-left position marker */}
+                      <rect x="10" y="66" width="24" height="24" rx="4" fill="#0f172a" />
+                      <rect x="14" y="70" width="16" height="16" rx="2" fill="white" />
+                      <rect x="18" y="74" width="8" height="8" rx="1" fill="#0f172a" />
+                      {/* Data patterns (simulated QR matrices) */}
+                      <rect x="40" y="12" width="6" height="6" fill="#0f172a" />
+                      <rect x="52" y="12" width="6" height="6" fill="#0f172a" />
+                      <rect x="44" y="22" width="12" height="6" fill="#0f172a" />
+                      <rect x="40" y="32" width="6" height="12" fill="#0f172a" />
+                      <rect x="50" y="36" width="8" height="8" fill="#e11d48" />
+                      <rect x="12" y="42" width="6" height="6" fill="#0f172a" />
+                      <rect x="24" y="42" width="8" height="6" fill="#0f172a" />
+                      <rect x="66" y="40" width="10" height="6" fill="#0f172a" />
+                      <rect x="80" y="40" width="8" height="8" fill="#0f172a" />
+                      <rect x="70" y="52" width="6" height="14" fill="#0f172a" />
+                      <rect x="82" y="54" width="8" height="6" fill="#0f172a" />
+                      <rect x="40" y="52" width="6" height="6" fill="#0f172a" />
+                      <rect x="52" y="52" width="6" height="6" fill="#0f172a" />
+                      <rect x="44" y="64" width="14" height="6" fill="#0f172a" />
+                      <rect x="40" y="76" width="6" height="14" fill="#0f172a" />
+                      <rect x="52" y="76" width="8" height="6" fill="#0f172a" />
+                      <rect x="66" y="74" width="12" height="6" fill="#0f172a" />
+                      <rect x="82" y="74" width="8" height="16" fill="#0f172a" />
+                      <rect x="66" y="86" width="8" height="6" fill="#0f172a" />
+                    </svg>
+
+                    {/* Center Badge AZ GO */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="px-2 py-0.5 bg-rose-600 text-white rounded text-[10px] font-black shadow-md border-2 border-white">
+                        AZ GO
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Merchant Details */}
               <div className="text-xs space-y-1">
                 <p className="font-extrabold text-slate-900">
-                  AZ GO PAY — {merchantName || 'Mitra Toko & Resto'}
+                  {qrisConfig?.merchantName ? qrisConfig.merchantName : `AZ GO PAY — ${merchantName || 'Mitra Toko & Resto'}`}
                 </p>
                 <p className="text-[11px] text-slate-500 font-mono">
-                  NMID: ID1029384756209 • No. Pesanan: {orderNumber}
+                  NMID: {qrisConfig?.nmid || 'ID1029384756209'} • No. Pesanan: {orderNumber}
                 </p>
+                {qrisConfig?.bankName && (
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    Rekening / Penyedia: <span className="font-bold text-slate-900">{qrisConfig.bankName}</span>
+                  </p>
+                )}
                 <div className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-emerald-700 font-bold">
                   <ShieldCheck className="w-3.5 h-3.5" /> Terverifikasi Aman & Bebas Biaya Admin
                 </div>
+                {qrisConfig?.instructions && (
+                  <p className="text-[11px] text-amber-900 bg-amber-50 p-2.5 rounded-xl mt-2 border border-amber-200 text-left font-medium">
+                    💡 <b>Petunjuk:</b> {qrisConfig.instructions}
+                  </p>
+                )}
               </div>
 
               {/* Supported Apps Badges */}
