@@ -12,7 +12,12 @@ import {
   ChevronUp, 
   ChevronDown, 
   Check, 
-  Database
+  Lock,
+  ShieldAlert,
+  Eye,
+  EyeOff,
+  KeyRound,
+  X
 } from 'lucide-react';
 
 interface DemoBannerProps {
@@ -33,6 +38,67 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
   const [resetSuccess, setResetSuccess] = useState<boolean>(false);
+
+  // Proteksi PIN Masuk Mode Real
+  const [showPinModal, setShowPinModal] = useState<boolean>(false);
+  const [inputPin, setInputPin] = useState<string>('');
+  const [showPinText, setShowPinText] = useState<boolean>(false);
+  const [pinError, setPinError] = useState<string>('');
+  const [pinSuccess, setPinSuccess] = useState<boolean>(false);
+  const [showChangePinSection, setShowChangePinSection] = useState<boolean>(false);
+  const [newPinValue, setNewPinValue] = useState<string>('');
+  const [changePinMsg, setChangePinMsg] = useState<string>('');
+
+  const handleOpenRealModeModal = () => {
+    setInputPin('');
+    setPinError('');
+    setPinSuccess(false);
+    setShowChangePinSection(false);
+    setNewPinValue('');
+    setChangePinMsg('');
+    setShowPinModal(true);
+  };
+
+  const handleVerifyPin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = inputPin.trim();
+    const customPin = localStorage.getItem('azgo_real_mode_pin');
+    const envPin = (import.meta as any).env?.VITE_REAL_MODE_PIN;
+
+    // PIN yang valid: custom pin, env pin, atau default '8899', 'azgo2026', '123456'
+    const validPins = [customPin, envPin, '8899', 'azgo2026', '123456'].filter(Boolean);
+
+    if (validPins.includes(trimmed)) {
+      setPinError('');
+      setPinSuccess(true);
+      setTimeout(() => {
+        setShowPinModal(false);
+        onToggleDemoMode(false);
+      }, 700);
+    } else {
+      setPinError('Kode Otorisasi Salah! Akses Mode Real hanya untuk tim internal AzGo.');
+    }
+  };
+
+  const handleSaveNewPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPinValue.trim() || newPinValue.trim().length < 4) {
+      setPinError('PIN baru minimal harus 4 karakter.');
+      return;
+    }
+    localStorage.setItem('azgo_real_mode_pin', newPinValue.trim());
+    setChangePinMsg(`✅ PIN Keamanan berhasil diubah menjadi: ${newPinValue.trim()}`);
+    setNewPinValue('');
+    setShowChangePinSection(false);
+    setTimeout(() => setChangePinMsg(''), 5000);
+  };
+
+  const handleReset = () => {
+    onResetDemoData();
+    setShowResetConfirm(false);
+    setResetSuccess(true);
+    setTimeout(() => setResetSuccess(false), 3000);
+  };
 
   const demoAccounts = [
     {
@@ -90,13 +156,6 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({
       color: 'bg-slate-900 hover:bg-black text-white'
     }
   ];
-
-  const handleReset = () => {
-    onResetDemoData();
-    setShowResetConfirm(false);
-    setResetSuccess(true);
-    setTimeout(() => setResetSuccess(false), 3000);
-  };
 
   // Jika mode demo dimatikan (Mode Real Aktif)
   if (!isDemoMode) {
@@ -244,13 +303,13 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({
                 </button>
               )}
 
-              {/* Toggle ke Mode Real */}
+              {/* Toggle ke Mode Real dengan Proteksi PIN */}
               <button
-                onClick={() => onToggleDemoMode(false)}
-                title="Beralih ke Mode Data Nyata (Real / Production)"
-                className="px-2 py-1 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 rounded-lg text-[11px] font-semibold border border-emerald-800/80 transition flex items-center gap-1"
+                onClick={handleOpenRealModeModal}
+                title="Beralih ke Mode Data Nyata (Real / Production) — Memerlukan PIN Keamanan"
+                className="px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 rounded-lg text-[11px] font-bold border border-emerald-700/80 transition flex items-center gap-1.5 shadow-xs"
               >
-                <Database className="w-3 h-3 text-emerald-400" />
+                <Lock className="w-3 h-3 text-emerald-400" />
                 <span className="hidden md:inline">Ke Mode Real</span>
               </button>
 
@@ -268,6 +327,177 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({
 
         </div>
       </div>
+
+      {/* MODAL PROTEKSI PIN MASUK MODE REAL */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-[999] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700/90 text-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative animate-fade-in">
+            {/* Tombol Tutup */}
+            <button
+              onClick={() => setShowPinModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header Dialog */}
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  Proteksi Akses Mode Real
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Otorisasi Keamanan Data Produksi AzGo
+                </p>
+              </div>
+            </div>
+
+            {/* Peringatan Keamanan Data */}
+            <div className="bg-amber-950/30 border border-amber-500/20 rounded-2xl p-3.5 mb-4 text-xs text-amber-200/90 leading-relaxed">
+              <p className="font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" /> Peringatan Sistem Keamanan:
+              </p>
+              Mode Real terhubung langsung ke database operasional live. Untuk menjaga agar calon investor / tamu tidak sengaja mengubah data real, diperlukan <strong>PIN Otorisasi</strong>.
+            </div>
+
+            {/* Notifikasi feedback sukses ubah PIN */}
+            {changePinMsg && (
+              <div className="mb-3 p-2.5 bg-emerald-950/50 border border-emerald-500/40 rounded-xl text-xs text-emerald-300 font-semibold flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{changePinMsg}</span>
+              </div>
+            )}
+
+            {/* Form Input PIN */}
+            {!showChangePinSection ? (
+              <form onSubmit={handleVerifyPin} className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-200">
+                      Masukkan PIN Otorisasi:
+                    </label>
+                    <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                      Default: 8899 atau azgo2026
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showPinText ? 'text' : 'password'}
+                      value={inputPin}
+                      onChange={(e) => {
+                        setInputPin(e.target.value);
+                        if (pinError) setPinError('');
+                      }}
+                      autoFocus
+                      placeholder="Masukkan PIN keamanan..."
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent tracking-widest font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPinText(!showPinText)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                    >
+                      {showPinText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {pinError && (
+                    <div className="mt-2 text-xs text-rose-400 font-semibold flex items-center gap-1.5 bg-rose-950/40 p-2.5 rounded-xl border border-rose-800/40">
+                      <X className="w-4 h-4 shrink-0" />
+                      <span>{pinError}</span>
+                    </div>
+                  )}
+
+                  {pinSuccess && (
+                    <div className="mt-2 text-xs text-emerald-400 font-semibold flex items-center gap-1.5 bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-800/40">
+                      <Check className="w-4 h-4 shrink-0" />
+                      <span>PIN Terverifikasi! Mengalihkan ke Mode Real...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPinModal(false)}
+                    className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition"
+                  >
+                    Tetap di Mode Demo
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!inputPin.trim() || pinSuccess}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Verifikasi PIN</span>
+                  </button>
+                </div>
+
+                {/* Tombol Ganti PIN khusus jika role ADMIN */}
+                {currentUser?.role === 'ADMIN' && (
+                  <div className="pt-2 text-center border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowChangePinSection(true)}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline flex items-center justify-center gap-1 mx-auto"
+                    >
+                      <KeyRound className="w-3 h-3" /> Ingin Ubah Kode PIN Mode Real Ini?
+                    </button>
+                  </div>
+                )}
+              </form>
+            ) : (
+              /* Form Ubah PIN Baru */
+              <form onSubmit={handleSaveNewPin} className="space-y-4">
+                <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-xs text-slate-300">
+                  <span className="font-bold text-amber-400">Atur PIN Baru Anda:</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Hanya Anda yang tahu kode ini. Simpan kode ini untuk membuka akses Mode Real nantinya.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-200 mb-1">
+                    PIN Baru (minimal 4 digit/huruf):
+                  </label>
+                  <input
+                    type="text"
+                    value={newPinValue}
+                    onChange={(e) => setNewPinValue(e.target.value)}
+                    autoFocus
+                    placeholder="Contoh: 9988 atau azgomanajer"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono tracking-widest"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowChangePinSection(false)}
+                    className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition"
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!newPinValue.trim()}
+                    className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Simpan PIN Baru</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+          </div>
+        </div>
+      )}
     </aside>
   );
 };
