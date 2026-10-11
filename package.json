@@ -1,0 +1,19 @@
+{
+  "name": "delivery-superapp-monorepo",
+  "version": "1.0.0",
+  "description": "Platform On-Demand & Ekspedisi Multi-Layanan dengan Arsitektur Terpisah (Decoupled)",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace=apps/api run dev",
+    "dev:web": "npm --workspace=apps/web run dev",
+    "build": "npm --workspaces run build",
+    "lint": "npm --workspaces run lint"
+  },
+  "keywords": ["logistics", "ride-hailing", "food-delivery", "expedition", "jnt-model", "clean-architecture"],
+  "author": "",
+  "license": "ISC"
+}
