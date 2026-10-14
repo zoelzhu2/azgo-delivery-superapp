@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@delivery/shared": "*",
+    "@supabase/supabase-js": "^2.117.3",
     "@types/leaflet": "^1.9.22",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.378.0",

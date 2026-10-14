@@ -13,6 +13,7 @@ import {
   MOCK_WITHDRAWALS, 
   MOCK_PARTNER_APPLICATIONS 
 } from './mockBackend';
+import { getSupabase } from './supabaseClient';
 
 const BASE_URL = '/api';
 
@@ -377,14 +378,58 @@ export const api = {
     }));
   },
 
-  // 9. AUTH & USER MANAGEMENT APIS
+  // 9. AUTH & USER MANAGEMENT APIS (TERHUBUNG KE SUPABASE REAL DENGAN FALLBACK MOCK)
   async login(identifier: string, password?: string): Promise<any> {
+    const cleanId = (identifier || '').trim().toLowerCase();
+    const sb = getSupabase();
+
+    // 1. Coba verifikasi ke database Supabase (Mode Real)
+    if (sb) {
+      try {
+        let query = sb.from('users').select('*');
+        if (cleanId === 'admin') {
+          query = query.or('email.ilike.admin%,email.ilike.%admin@%');
+        } else {
+          query = query.or(`email.ilike.${cleanId},phone.eq.${cleanId}`);
+        }
+
+        const { data: sbUser, error } = await query.limit(1).maybeSingle();
+        if (sbUser && !error) {
+          if (password && sbUser.password !== password) {
+            return { success: false, message: 'Password salah. Periksa kembali password Anda.' };
+          }
+          if (sbUser.is_active === false) {
+            return { success: false, message: 'Akun Anda sedang dinonaktifkan / diblokir oleh Administrator.' };
+          }
+
+          const userObj = {
+            id: sbUser.id,
+            email: sbUser.email,
+            phone: sbUser.phone || '',
+            fullName: sbUser.full_name,
+            role: sbUser.role as UserRole,
+            isActive: sbUser.is_active !== false,
+            createdAt: sbUser.created_at || new Date().toISOString(),
+            updatedAt: sbUser.updated_at || new Date().toISOString()
+          };
+
+          return {
+            success: true,
+            message: 'Login berhasil!',
+            data: { user: userObj, token: 'sb-jwt-' + sbUser.id }
+          };
+        }
+      } catch (sbErr) {
+        console.warn('Supabase login check skipped, fallback to mock:', sbErr);
+      }
+    }
+
+    // 2. Fallback ke akun mock instan jika belum ada di Supabase
     return safeFetch('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password })
     }, () => {
-      const cleanId = (identifier || '').trim().toLowerCase();
       // Cari akun mock yang cocok berdasarkan email atau nomor telepon
       const user = MOCK_USERS.find(
         u => u.email.toLowerCase() === cleanId || u.phone === cleanId
@@ -469,6 +514,40 @@ export const api = {
   },
 
   async registerCustomer(data: { fullName: string; phone: string; email: string; password?: string }): Promise<any> {
+    const sb = getSupabase();
+    if (sb) {
+      try {
+        const { data: newUser, error } = await sb.from('users').insert({
+          email: data.email,
+          phone: data.phone,
+          full_name: data.fullName,
+          role: 'CUSTOMER',
+          password: data.password || 'user123',
+          is_active: true
+        }).select().single();
+
+        if (newUser && !error) {
+          return {
+            success: true,
+            message: 'Pendaftaran akun berhasil!',
+            data: {
+              user: {
+                id: newUser.id,
+                fullName: newUser.full_name,
+                phone: newUser.phone,
+                email: newUser.email,
+                role: 'CUSTOMER',
+                isActive: newUser.is_active !== false,
+                createdAt: newUser.created_at,
+                updatedAt: newUser.updated_at
+              },
+              token: 'sb-reg-token-' + newUser.id
+            }
+          };
+        }
+      } catch (err) {}
+    }
+
     return safeFetch('/auth/register-customer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -496,6 +575,18 @@ export const api = {
   },
 
   async changeOwnPassword(userId: string, currentPassword: string, newPassword: string): Promise<any> {
+    const sb = getSupabase();
+    if (sb) {
+      try {
+        const { data: curr } = await sb.from('users').select('password').eq('id', userId).maybeSingle();
+        if (curr && curr.password !== currentPassword) {
+          return { success: false, message: 'Password saat ini salah.' };
+        }
+        await sb.from('users').update({ password: newPassword, updated_at: new Date().toISOString() }).eq('id', userId);
+        return { success: true, message: 'Password berhasil diubah!' };
+      } catch (err) {}
+    }
+
     return safeFetch('/auth/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -507,6 +598,28 @@ export const api = {
   },
 
   async getAdminUsers(): Promise<any> {
+    const sb = getSupabase();
+    if (sb) {
+      try {
+        const { data, error } = await sb.from('users').select('*').order('created_at', { ascending: false });
+        if (data && data.length > 0 && !error) {
+          return {
+            success: true,
+            data: data.map(u => ({
+              id: u.id,
+              email: u.email,
+              phone: u.phone,
+              fullName: u.full_name,
+              role: u.role as UserRole,
+              isActive: u.is_active !== false,
+              createdAt: u.created_at || new Date().toISOString(),
+              updatedAt: u.updated_at || new Date().toISOString()
+            }))
+          };
+        }
+      } catch (err) {}
+    }
+
     return safeFetch('/auth/users', undefined, () => ({
       success: true,
       data: MOCK_USERS
@@ -514,6 +627,38 @@ export const api = {
   },
 
   async createAdminUser(data: { email: string; phone: string; fullName: string; role: string; password?: string }): Promise<any> {
+    const sb = getSupabase();
+    if (sb) {
+      try {
+        const role = (data.role || 'CUSTOMER') as UserRole;
+        const { data: newUser, error } = await sb.from('users').insert({
+          email: data.email,
+          phone: data.phone,
+          full_name: data.fullName,
+          role,
+          password: data.password || 'admin123',
+          is_active: true
+        }).select().single();
+
+        if (newUser && !error) {
+          return {
+            success: true,
+            message: 'User berhasil dibuat',
+            data: {
+              id: newUser.id,
+              email: newUser.email,
+              phone: newUser.phone,
+              fullName: newUser.full_name,
+              role: newUser.role as UserRole,
+              isActive: newUser.is_active !== false,
+              createdAt: newUser.created_at,
+              updatedAt: newUser.updated_at
+            }
+          };
+        }
+      } catch (err) {}
+    }
+
     return safeFetch('/auth/create-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -536,6 +681,14 @@ export const api = {
   },
 
   async adminResetPassword(targetUserId: string, newPassword: string): Promise<any> {
+    const sb = getSupabase();
+    if (sb) {
+      try {
+        await sb.from('users').update({ password: newPassword, updated_at: new Date().toISOString() }).eq('id', targetUserId);
+        return { success: true, message: `Password berhasil direset menjadi: ${newPassword}` };
+      } catch (err) {}
+    }
+
     return safeFetch('/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -568,10 +721,39 @@ export const api = {
   },
 
   async toggleAdminUser(userId: string): Promise<any> {
-    return safeFetch(`/auth/users/${userId}/toggle`, { method: 'PATCH' }, () => ({
-      success: true,
-      message: 'Status user diperbarui'
-    }));
+    const sb = getSupabase();
+    if (sb) {
+      try {
+        const { data: curr } = await sb.from('users').select('*').eq('id', userId).maybeSingle();
+        if (curr) {
+          const newStatus = !curr.is_active;
+          await sb.from('users').update({ is_active: newStatus, updated_at: new Date().toISOString() }).eq('id', userId);
+          return {
+            success: true,
+            message: `Akses login user ${curr.full_name} berhasil ${newStatus ? 'diaktifkan' : 'diblokir'}`,
+            data: {
+              id: userId,
+              fullName: curr.full_name,
+              isActive: newStatus
+            }
+          };
+        }
+      } catch (err) {}
+    }
+
+    return safeFetch(`/auth/users/${userId}/toggle`, { method: 'PATCH' }, () => {
+      const mock = MOCK_USERS.find(u => u.id === userId);
+      const newStatus = mock ? !mock.isActive : false;
+      return {
+        success: true,
+        message: 'Status user diperbarui',
+        data: {
+          id: userId,
+          fullName: mock?.fullName || 'User',
+          isActive: newStatus
+        }
+      };
+    });
   },
 
   async getAdminServices(): Promise<any> {
