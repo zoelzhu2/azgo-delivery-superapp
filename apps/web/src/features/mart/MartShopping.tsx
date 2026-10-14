@@ -26,6 +26,7 @@ interface MartShoppingProps {
   onRequestLogin?: (message: string, callback?: () => void) => void;
   onOrderCreated?: (order: CustomerOrder) => void;
   onTrackOrder?: (order: CustomerOrder) => void;
+  isDemoMode?: boolean;
 }
 
 export const MartShopping: React.FC<MartShoppingProps> = ({ 
@@ -33,7 +34,8 @@ export const MartShopping: React.FC<MartShoppingProps> = ({
   currentUser,
   onRequestLogin,
   onOrderCreated,
-  onTrackOrder
+  onTrackOrder,
+  isDemoMode = false
 }) => {
   const [stores, setStores] = useState<any[]>([]);
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
@@ -54,7 +56,7 @@ export const MartShopping: React.FC<MartShoppingProps> = ({
         setStores(res.data.filter((s: any) => s.isActive !== false));
       }
     });
-  }, []);
+  }, [isDemoMode]);
 
   const totalCartCount = Object.values(cart).reduce((a, b) => a + b, 0);
 
@@ -385,6 +387,16 @@ export const MartShopping: React.FC<MartShoppingProps> = ({
               )}
             </button>
           </div>
+        </div>
+      ) : stores.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-12 text-center shadow-sm max-w-xl mx-auto my-6">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">
+            🛒
+          </div>
+          <h3 className="font-extrabold text-slate-800 text-base mb-1">Belum Ada Toko Mart Terdaftar</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Di Mode Real, data toko minimarket & sembako masih kosong. Administrator dapat menambahkan mitra toko mart baru melalui Dashboard Admin atau mitra dapat mendaftar langsung.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

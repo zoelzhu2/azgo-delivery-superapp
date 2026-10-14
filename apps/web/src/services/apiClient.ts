@@ -17,6 +17,47 @@ import { getSupabase } from './supabaseClient';
 
 const BASE_URL = '/api';
 
+let runtimeDemoMode: boolean | null = null;
+
+export const setApiDemoMode = (isDemo: boolean) => {
+  runtimeDemoMode = isDemo;
+};
+
+export const isCurrentDemoMode = (): boolean => {
+  if (runtimeDemoMode !== null) return runtimeDemoMode;
+  if (typeof window === 'undefined') return false;
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.get('demo') === 'true' || searchParams.get('demo') === '1' || searchParams.get('mode') === 'demo') {
+    return true;
+  }
+  if (searchParams.get('real') === 'true' || searchParams.get('real') === '1' || searchParams.get('mode') === 'real') {
+    return false;
+  }
+  const saved = localStorage.getItem('azgo_demo_mode');
+  if (saved !== null) {
+    return saved === 'true';
+  }
+  return false; // Default: Real mode (bersih)
+};
+
+// Real Mode Local Persistence Helpers
+function getRealStorage<T>(key: string, defaultValue: T): T {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+function setRealStorage<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
 /**
  * Helper request aman (Safe Fetch):
  * Menghubungi backend API jika ada. 
@@ -121,15 +162,32 @@ export const api = {
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const randomDigits = Math.floor(1000 + Math.random() * 9000);
       const awb = `${prefix}-${dateStr}-${randomDigits}`;
+      const newOrder = {
+        id: 'ord-' + Date.now(),
+        orderNumber: awb,
+        trackingNumber: awb,
+        serviceType: data.serviceType === 'EXPRESS' ? 'AZ_EXPRESS' : (data.serviceType === 'CARGO' ? 'AZ_CARGO' : 'AZ_COURIER'),
+        serviceName: data.serviceType === 'EXPRESS' ? 'Az Express (Kilat)' : (data.serviceType === 'CARGO' ? 'Az Cargo' : 'Az Courier'),
+        customerName: data.senderName || 'Pelanggan AzGo',
+        customerPhone: data.senderPhone || '',
+        driverName: 'Menunggu Driver',
+        pickup: data.originCity || data.pickupAddress || 'Drop Point',
+        dropoff: data.destinationCity || data.deliveryAddress || 'Alamat Penerima',
+        status: 'ORDER_CREATED',
+        totalAmount: Number(data.totalCost) || Number(data.totalAmount) || 15000,
+        createdAt: new Date().toISOString(),
+        ...data
+      };
+
+      if (!isCurrentDemoMode()) {
+        const existing = getRealStorage<any[]>('azgo_real_admin_orders', []);
+        setRealStorage('azgo_real_admin_orders', [newOrder, ...existing]);
+      }
+
       return {
         success: true,
         message: 'Resi Pengiriman Berhasil Diterbitkan!',
-        data: {
-          ...data,
-          trackingNumber: awb,
-          status: 'ORDER_CREATED',
-          createdAt: new Date().toISOString()
-        }
+        data: newOrder
       };
     });
   },
@@ -149,15 +207,33 @@ export const api = {
       body: JSON.stringify(data)
     }, () => {
       const pCode = 'AZP-' + Math.floor(100000 + Math.random() * 900000);
+      const newOrder = {
+        id: 'ord-' + Date.now(),
+        pickupCode: pCode,
+        orderNumber: pCode,
+        trackingNumber: pCode,
+        serviceType: 'AZ_PICKUP',
+        serviceName: 'Az Pickup (Jemput Paket)',
+        customerName: data.senderName,
+        customerPhone: data.senderPhone,
+        driverName: 'Menunggu Kurir Penjemput',
+        pickup: data.pickupAddress,
+        dropoff: 'Drop Point Terdekat',
+        status: 'SCHEDULED',
+        totalAmount: 0,
+        createdAt: new Date().toISOString(),
+        ...data
+      };
+
+      if (!isCurrentDemoMode()) {
+        const existing = getRealStorage<any[]>('azgo_real_admin_orders', []);
+        setRealStorage('azgo_real_admin_orders', [newOrder, ...existing]);
+      }
+
       return {
         success: true,
         message: 'Permintaan jemput paket berhasil dijadwalkan!',
-        data: {
-          ...data,
-          pickupCode: pCode,
-          orderNumber: pCode,
-          status: 'SCHEDULED'
-        }
+        data: newOrder
       };
     });
   },
@@ -165,6 +241,39 @@ export const api = {
   // 5. Universal Tracking (Semua Resi AZ GO)
   async trackAWB(awb: string): Promise<any> {
     return safeFetch(`/expedition/track/${awb}`, undefined, () => {
+      if (!isCurrentDemoMode()) {
+        const realOrders = getRealStorage<any[]>('azgo_real_admin_orders', []);
+        const found = realOrders.find(o => o.orderNumber === awb || o.trackingNumber === awb);
+        if (found) {
+          return {
+            success: true,
+            message: 'Data pelacakan resi berhasil ditemukan',
+            data: {
+              trackingNumber: awb,
+              serviceType: found.serviceType,
+              serviceName: found.serviceName,
+              status: found.status || 'ORDER_CREATED',
+              origin: found.pickup,
+              destination: found.dropoff,
+              senderName: found.customerName || found.senderName || 'Pengirim',
+              receiverName: found.receiverName || 'Penerima',
+              checkpoints: [
+                { 
+                  title: 'Pesanan Diterima Sistem', 
+                  description: 'Resi terdaftar dalam antrean sistem operasional', 
+                  city: found.pickup, 
+                  timestamp: found.createdAt 
+                }
+              ]
+            }
+          };
+        }
+        return {
+          success: false,
+          message: `Nomor resi ${awb} tidak ditemukan pada database operasional.`
+        };
+      }
+
       const isExpress = awb.startsWith('AZX');
       const isCargo = awb.startsWith('AZK');
       return {
@@ -199,26 +308,37 @@ export const api = {
   },
 
   async getHubs(): Promise<any> {
-    return safeFetch('/expedition/hubs', undefined, () => ({
-      success: true,
-      data: MOCK_HUBS
-    }));
+    return safeFetch('/expedition/hubs', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return { success: true, data: MOCK_HUBS };
+      }
+      const realHubs = getRealStorage<any[]>('azgo_real_hubs', []);
+      return { success: true, data: realHubs.filter(h => h.isActive !== false) };
+    });
   },
 
   // 6. Az Delivery (Resto Makanan & Minuman)
   async getRestaurants(): Promise<any> {
-    return safeFetch('/food/restaurants', undefined, () => ({
-      success: true,
-      data: MOCK_RESTAURANTS
-    }));
+    return safeFetch('/food/restaurants', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return { success: true, data: MOCK_RESTAURANTS };
+      }
+      const realMerchants = getRealStorage<any[]>('azgo_real_merchants', []);
+      const foodStores = realMerchants.filter(m => m.type === 'FOOD' && m.isActive !== false);
+      return { success: true, data: foodStores };
+    });
   },
 
   // 7. Az Mart (Belanja Sembako, Minimarket, Sayur)
   async getMartStores(): Promise<any> {
-    return safeFetch('/food/marts', undefined, () => ({
-      success: true,
-      data: MOCK_MARTS
-    }));
+    return safeFetch('/food/marts', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return { success: true, data: MOCK_MARTS };
+      }
+      const realMerchants = getRealStorage<any[]>('azgo_real_merchants', []);
+      const martStores = realMerchants.filter(m => m.type === 'MART' && m.isActive !== false);
+      return { success: true, data: martStores };
+    });
   },
 
   async calculateOrder(items: { productId: string; quantity: number }[], isMart: boolean = false): Promise<any> {
@@ -260,24 +380,46 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }, () => ({
-      success: true,
-      data: { ...data, id: 'ride-' + Date.now(), status: 'SEARCHING_DRIVER' }
-    }));
+    }, () => {
+      const newRide = { ...data, id: 'ride-' + Date.now(), status: 'SEARCHING_DRIVER', createdAt: new Date().toISOString() };
+      if (!isCurrentDemoMode()) {
+        const existing = getRealStorage<any[]>('azgo_real_admin_orders', []);
+        setRealStorage('azgo_real_admin_orders', [newRide, ...existing]);
+      }
+      return { success: true, data: newRide };
+    });
   },
 
   // 8. ADMIN BACKOFFICE APIS
   async getAdminMetrics(): Promise<any> {
-    return safeFetch('/admin/overview', undefined, () => ({
-      success: true,
-      data: {
-        todayRevenue: 18450000,
-        activeOrdersCount: 24,
-        onlineDriversCount: 18,
-        totalParcelsToday: 142,
-        onTimeDeliveryRate: '98.4%'
+    return safeFetch('/admin/overview', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return {
+          success: true,
+          data: {
+            todayRevenue: 18450000,
+            activeOrdersCount: 24,
+            onlineDriversCount: 18,
+            totalParcelsToday: 142,
+            onTimeDeliveryRate: '98.4%'
+          }
+        };
       }
-    }));
+
+      const orders = getRealStorage<any[]>('azgo_real_admin_orders', []);
+      const drivers = getRealStorage<any[]>('azgo_real_drivers', []);
+      const todayRevenue = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || Number(o.totalCost) || 0), 0);
+      return {
+        success: true,
+        data: {
+          todayRevenue,
+          activeOrdersCount: orders.length,
+          onlineDriversCount: drivers.filter(d => d.isActive !== false).length,
+          totalParcelsToday: orders.length,
+          onTimeDeliveryRate: orders.length > 0 ? '100%' : '-'
+        }
+      };
+    });
   },
 
   async getAdminOrders(serviceType?: string): Promise<any> {
@@ -285,21 +427,29 @@ export const api = {
       ? `/admin/orders?serviceType=${serviceType}`
       : `/admin/orders`;
     return safeFetch(url, undefined, () => {
-      const filtered = serviceType && serviceType !== 'ALL'
-        ? MOCK_ADMIN_ORDERS.filter(o => o.serviceType === serviceType)
-        : MOCK_ADMIN_ORDERS;
-      return {
-        success: true,
-        data: filtered
-      };
+      if (isCurrentDemoMode()) {
+        const filtered = serviceType && serviceType !== 'ALL'
+          ? MOCK_ADMIN_ORDERS.filter(o => o.serviceType === serviceType)
+          : MOCK_ADMIN_ORDERS;
+        return { success: true, data: filtered };
+      }
+
+      let realOrders = getRealStorage<any[]>('azgo_real_admin_orders', []);
+      if (serviceType && serviceType !== 'ALL') {
+        realOrders = realOrders.filter(o => o.serviceType === serviceType);
+      }
+      return { success: true, data: realOrders };
     });
   },
 
   async getAdminPricing(): Promise<any> {
-    return safeFetch('/admin/pricing', undefined, () => ({
-      success: true,
-      data: MOCK_PRICING
-    }));
+    return safeFetch('/admin/pricing', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return { success: true, data: MOCK_PRICING };
+      }
+      const realPricing = getRealStorage('azgo_real_pricing', MOCK_PRICING);
+      return { success: true, data: realPricing };
+    });
   },
 
   async updateAdminPricing(configs: any): Promise<any> {
@@ -307,25 +457,40 @@ export const api = {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(configs)
-    }, () => ({
-      success: true,
-      message: 'Konfigurasi tarif berhasil diperbarui',
-      data: configs
-    }));
+    }, () => {
+      if (!isCurrentDemoMode()) {
+        setRealStorage('azgo_real_pricing', configs);
+      }
+      return {
+        success: true,
+        message: 'Konfigurasi tarif berhasil diperbarui',
+        data: configs
+      };
+    });
   },
 
   async getAdminDrivers(): Promise<any> {
-    return safeFetch('/admin/drivers', undefined, () => ({
-      success: true,
-      data: MOCK_DRIVERS
-    }));
+    return safeFetch('/admin/drivers', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return { success: true, data: MOCK_DRIVERS };
+      }
+      const realDrivers = getRealStorage<any[]>('azgo_real_drivers', []);
+      return { success: true, data: realDrivers };
+    });
   },
 
   async verifyDriver(driverId: string): Promise<any> {
-    return safeFetch(`/admin/drivers/${driverId}/verify`, { method: 'PATCH' }, () => ({
-      success: true,
-      message: 'Mitra driver berhasil diverifikasi'
-    }));
+    return safeFetch(`/admin/drivers/${driverId}/verify`, { method: 'PATCH' }, () => {
+      if (!isCurrentDemoMode()) {
+        const drivers = getRealStorage<any[]>('azgo_real_drivers', []);
+        const updated = drivers.map(d => d.id === driverId ? { ...d, status: 'VERIFIED', isVerified: true } : d);
+        setRealStorage('azgo_real_drivers', updated);
+      }
+      return {
+        success: true,
+        message: 'Mitra driver berhasil diverifikasi'
+      };
+    });
   },
 
   async createAdminDriver(data: any): Promise<any> {
@@ -333,18 +498,62 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }, () => ({
-      success: true,
-      message: 'Driver berhasil ditambahkan',
-      data: { ...data, id: 'drv-' + Date.now(), rating: 5.0, completedTrips: 0, status: 'ONLINE', isVerified: true }
-    }));
+    }, () => {
+      const newDriver = {
+        ...data,
+        id: 'drv-' + Date.now(),
+        rating: 5.0,
+        completedTrips: 0,
+        status: 'ONLINE',
+        isOnline: true,
+        isActive: true,
+        isVerified: true,
+        createdAt: new Date().toISOString()
+      };
+
+      if (!isCurrentDemoMode()) {
+        const drivers = getRealStorage<any[]>('azgo_real_drivers', []);
+        setRealStorage('azgo_real_drivers', [newDriver, ...drivers]);
+      }
+
+      return {
+        success: true,
+        message: 'Driver berhasil ditambahkan',
+        data: newDriver
+      };
+    });
+  },
+
+  async toggleAdminDriver(driverId: string): Promise<any> {
+    return safeFetch(`/admin/drivers/${driverId}/toggle`, { method: 'PATCH' }, () => {
+      if (!isCurrentDemoMode()) {
+        const drivers = getRealStorage<any[]>('azgo_real_drivers', []);
+        const target = drivers.find(d => d.id === driverId);
+        const newStatus = target ? !target.isActive : false;
+        const updated = drivers.map(d => d.id === driverId ? { ...d, isActive: newStatus } : d);
+        setRealStorage('azgo_real_drivers', updated);
+        return {
+          success: true,
+          message: 'Status driver diperbarui',
+          data: { id: driverId, isActive: newStatus }
+        };
+      }
+      return {
+        success: true,
+        message: 'Status driver diperbarui',
+        data: { id: driverId, isActive: true }
+      };
+    });
   },
 
   async getAdminMerchants(): Promise<any> {
-    return safeFetch('/admin/merchants', undefined, () => ({
-      success: true,
-      data: [...MOCK_RESTAURANTS, ...MOCK_MARTS]
-    }));
+    return safeFetch('/admin/merchants', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return { success: true, data: [...MOCK_RESTAURANTS, ...MOCK_MARTS] };
+      }
+      const realMerchants = getRealStorage<any[]>('azgo_real_merchants', []);
+      return { success: true, data: realMerchants };
+    });
   },
 
   async createAdminMerchant(data: any): Promise<any> {
@@ -352,18 +561,75 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }, () => ({
-      success: true,
-      message: 'Mitra toko berhasil ditambahkan',
-      data: { ...data, id: 'merch-' + Date.now(), rating: 5.0, isOpen: true, isActive: true, items: [] }
-    }));
+    }, () => {
+      const newMerchant = {
+        id: 'merch-' + Date.now(),
+        name: data.name,
+        type: data.type || 'FOOD',
+        category: data.category || (data.type === 'MART' ? 'Minimarket' : 'Kuliner'),
+        address: data.address || '',
+        rating: 5.0,
+        isOpen: true,
+        isActive: true,
+        bannerUrl: data.type === 'MART'
+          ? 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
+        items: data.initialItemName ? [
+          {
+            id: 'item-' + Date.now(),
+            name: data.initialItemName,
+            price: Number(data.initialItemPrice) || 25000,
+            category: data.category || 'Menu Utama',
+            isAvailable: true,
+            imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80'
+          }
+        ] : [],
+        createdAt: new Date().toISOString()
+      };
+
+      if (!isCurrentDemoMode()) {
+        const merchants = getRealStorage<any[]>('azgo_real_merchants', []);
+        setRealStorage('azgo_real_merchants', [newMerchant, ...merchants]);
+      }
+
+      return {
+        success: true,
+        message: 'Mitra toko berhasil ditambahkan',
+        data: newMerchant
+      };
+    });
+  },
+
+  async toggleAdminMerchant(merchantId: string): Promise<any> {
+    return safeFetch(`/admin/merchants/${merchantId}/toggle`, { method: 'PATCH' }, () => {
+      if (!isCurrentDemoMode()) {
+        const merchants = getRealStorage<any[]>('azgo_real_merchants', []);
+        const target = merchants.find(m => m.id === merchantId);
+        const newStatus = target ? !target.isActive : false;
+        const updated = merchants.map(m => m.id === merchantId ? { ...m, isActive: newStatus } : m);
+        setRealStorage('azgo_real_merchants', updated);
+        return {
+          success: true,
+          message: 'Status toko diperbarui',
+          data: { id: merchantId, isActive: newStatus }
+        };
+      }
+      return {
+        success: true,
+        message: 'Status merchant diperbarui',
+        data: { id: merchantId, isActive: true }
+      };
+    });
   },
 
   async getAdminHubs(): Promise<any> {
-    return safeFetch('/admin/hubs', undefined, () => ({
-      success: true,
-      data: MOCK_HUBS
-    }));
+    return safeFetch('/admin/hubs', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return { success: true, data: MOCK_HUBS };
+      }
+      const realHubs = getRealStorage<any[]>('azgo_real_hubs', []);
+      return { success: true, data: realHubs };
+    });
   },
 
   async createAdminHub(data: any): Promise<any> {
@@ -371,11 +637,49 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }, () => ({
-      success: true,
-      message: 'Hub drop point berhasil ditambahkan',
-      data: { ...data, id: 'hub-' + Date.now(), isActive: true, totalIncomingParcels: 0, totalDispatchedParcels: 0 }
-    }));
+    }, () => {
+      const newHub = {
+        ...data,
+        id: 'hub-' + Date.now(),
+        isActive: true,
+        totalIncomingParcels: 0,
+        totalDispatchedParcels: 0,
+        createdAt: new Date().toISOString()
+      };
+
+      if (!isCurrentDemoMode()) {
+        const hubs = getRealStorage<any[]>('azgo_real_hubs', []);
+        setRealStorage('azgo_real_hubs', [newHub, ...hubs]);
+      }
+
+      return {
+        success: true,
+        message: 'Hub drop point berhasil ditambahkan',
+        data: newHub
+      };
+    });
+  },
+
+  async toggleAdminHub(hubId: string): Promise<any> {
+    return safeFetch(`/admin/hubs/${hubId}/toggle`, { method: 'PATCH' }, () => {
+      if (!isCurrentDemoMode()) {
+        const hubs = getRealStorage<any[]>('azgo_real_hubs', []);
+        const target = hubs.find(h => h.id === hubId);
+        const newStatus = target ? !target.isActive : false;
+        const updated = hubs.map(h => h.id === hubId ? { ...h, isActive: newStatus } : h);
+        setRealStorage('azgo_real_hubs', updated);
+        return {
+          success: true,
+          message: 'Status hub diperbarui',
+          data: { id: hubId, isActive: newStatus }
+        };
+      }
+      return {
+        success: true,
+        message: 'Status hub diperbarui',
+        data: { id: hubId, isActive: true }
+      };
+    });
   },
 
   // 9. AUTH & USER MANAGEMENT APIS (TERHUBUNG KE SUPABASE REAL DENGAN FALLBACK MOCK)
@@ -393,10 +697,11 @@ export const api = {
           query = query.or(`email.ilike.${cleanId},phone.eq.${cleanId}`);
         }
 
-        const { data: sbUser, error } = await query.limit(1).maybeSingle();
-        if (sbUser && !error) {
-          if (password && sbUser.password !== password) {
-            return { success: false, message: 'Password salah. Periksa kembali password Anda.' };
+        const { data: users, error } = await query;
+        if (!error && users && users.length > 0) {
+          const sbUser = users[0];
+          if (password && sbUser.password && sbUser.password !== password) {
+            return { success: false, message: 'Password yang Anda masukkan salah.' };
           }
           if (sbUser.is_active === false) {
             return { success: false, message: 'Akun Anda sedang dinonaktifkan / diblokir oleh Administrator.' };
@@ -420,17 +725,51 @@ export const api = {
           };
         }
       } catch (sbErr) {
-        console.warn('Supabase login check skipped, fallback to mock:', sbErr);
+        console.warn('Supabase login check error:', sbErr);
       }
     }
 
-    // 2. Fallback ke akun mock instan jika belum ada di Supabase
-    return safeFetch('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, password })
-    }, () => {
-      // Cari akun mock yang cocok berdasarkan email atau nomor telepon
+    // 2. Akun Real Admin bawaan (admin / admin123)
+    if (cleanId === 'admin' || cleanId === 'admin@azgo.com') {
+      if (!password || password === 'admin123') {
+        const realAdminUser = {
+          id: 'usr-admin-real',
+          email: 'admin@azgo.com',
+          phone: '081200000000',
+          fullName: 'Super Admin AzGo',
+          role: 'ADMIN' as UserRole,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        return {
+          success: true,
+          message: 'Login berhasil sebagai Super Admin',
+          data: { user: realAdminUser, token: 'real-session-admin' }
+        };
+      } else {
+        return { success: false, message: 'Password admin salah! (Default: admin123)' };
+      }
+    }
+
+    // 3. Cek di daftar user real local jika terdaftar
+    const realUsers = getRealStorage<any[]>('azgo_real_users', []);
+    const localUser = realUsers.find(
+      u => u.email.toLowerCase() === cleanId || u.phone === cleanId
+    );
+    if (localUser) {
+      if (password && localUser.password && localUser.password !== password) {
+        return { success: false, message: 'Password salah.' };
+      }
+      return {
+        success: true,
+        message: 'Login berhasil!',
+        data: { user: localUser, token: 'real-token-' + localUser.id }
+      };
+    }
+
+    // 4. Jika sedang di MODE DEMO: Boleh pakai akun demo instan
+    if (isCurrentDemoMode()) {
       const user = MOCK_USERS.find(
         u => u.email.toLowerCase() === cleanId || u.phone === cleanId
       );
@@ -438,79 +777,30 @@ export const api = {
       if (user) {
         return {
           success: true,
-          message: 'Login berhasil!',
-          data: {
-            user,
-            token: 'mock-session-jwt-' + user.id
-          }
+          message: 'Login berhasil (Demo)!',
+          data: { user, token: 'mock-session-jwt-' + user.id }
         };
       }
 
-      // Default jika mengetik 'admin'
-      if (cleanId.includes('admin')) {
-        return {
-          success: true,
-          message: 'Login berhasil sebagai Super Admin',
-          data: { user: MOCK_USERS[0], token: 'mock-session-admin' }
-        };
-      }
-
-      // Default jika mengetik 'driver'
       if (cleanId.includes('driver')) {
-        return {
-          success: true,
-          message: 'Login berhasil sebagai Driver',
-          data: { user: MOCK_USERS[1], token: 'mock-session-driver' }
-        };
+        return { success: true, message: 'Login demo Driver', data: { user: MOCK_USERS[1], token: 'mock-driver' } };
       }
-
-      // Default jika mengetik 'resto'
       if (cleanId.includes('resto')) {
-        return {
-          success: true,
-          message: 'Login berhasil sebagai Toko Resto',
-          data: { user: MOCK_USERS[2], token: 'mock-session-resto' }
-        };
+        return { success: true, message: 'Login demo Resto', data: { user: MOCK_USERS[2], token: 'mock-resto' } };
       }
-
-      // Default jika mengetik 'mart'
       if (cleanId.includes('mart')) {
-        return {
-          success: true,
-          message: 'Login berhasil sebagai Toko Mart',
-          data: { user: MOCK_USERS[3], token: 'mock-session-mart' }
-        };
+        return { success: true, message: 'Login demo Mart', data: { user: MOCK_USERS[3], token: 'mock-mart' } };
       }
-
-      // Default jika mengetik 'hub'
       if (cleanId.includes('hub')) {
-        return {
-          success: true,
-          message: 'Login berhasil sebagai Staf Hub',
-          data: { user: MOCK_USERS[4], token: 'mock-session-hub' }
-        };
+        return { success: true, message: 'Login demo Hub', data: { user: MOCK_USERS[4], token: 'mock-hub' } };
       }
+    }
 
-      // Default untuk pelanggan lainnya
-      const role: UserRole = 'CUSTOMER';
-      return {
-        success: true,
-        message: 'Login berhasil!',
-        data: {
-          user: {
-            id: 'usr-cust-' + Date.now(),
-            email: cleanId.includes('@') ? cleanId : `${cleanId}@customer.azgo.com`,
-            phone: cleanId.includes('@') ? '081299887766' : cleanId,
-            fullName: cleanId.includes('@') ? cleanId.split('@')[0] : 'Pelanggan AzGo',
-            role,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          token: 'mock-session-token'
-        }
-      };
-    });
+    // 5. Di Mode Real: Tolak jika akun tidak terdaftar
+    return {
+      success: false,
+      message: 'Akun tidak ditemukan. Di Mode Real, hanya akun resmi yang dapat masuk. Hubungi Admin untuk membuat akun.'
+    };
   },
 
   async registerCustomer(data: { fullName: string; phone: string; email: string; password?: string }): Promise<any> {
@@ -527,51 +817,47 @@ export const api = {
         }).select().single();
 
         if (newUser && !error) {
+          const uObj = {
+            id: newUser.id,
+            fullName: newUser.full_name,
+            phone: newUser.phone,
+            email: newUser.email,
+            role: 'CUSTOMER' as UserRole,
+            isActive: newUser.is_active !== false,
+            createdAt: newUser.created_at,
+            updatedAt: newUser.updated_at
+          };
+          const existing = getRealStorage<any[]>('azgo_real_users', []);
+          setRealStorage('azgo_real_users', [uObj, ...existing]);
+
           return {
             success: true,
             message: 'Pendaftaran akun berhasil!',
-            data: {
-              user: {
-                id: newUser.id,
-                fullName: newUser.full_name,
-                phone: newUser.phone,
-                email: newUser.email,
-                role: 'CUSTOMER',
-                isActive: newUser.is_active !== false,
-                createdAt: newUser.created_at,
-                updatedAt: newUser.updated_at
-              },
-              token: 'sb-reg-token-' + newUser.id
-            }
+            data: { user: uObj, token: 'sb-reg-token-' + newUser.id }
           };
         }
       } catch (err) {}
     }
 
-    return safeFetch('/auth/register-customer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }, () => {
-      const role: UserRole = 'CUSTOMER';
-      return {
-        success: true,
-        message: 'Pendaftaran akun berhasil!',
-        data: {
-          user: {
-            id: 'usr-cust-' + Date.now(),
-            fullName: data.fullName,
-            phone: data.phone,
-            email: data.email,
-            role,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          token: 'mock-reg-token'
-        }
-      };
-    });
+    const localNewUser = {
+      id: 'usr-cust-' + Date.now(),
+      fullName: data.fullName,
+      phone: data.phone,
+      email: data.email,
+      role: 'CUSTOMER' as UserRole,
+      password: data.password || 'user123',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const existing = getRealStorage<any[]>('azgo_real_users', []);
+    setRealStorage('azgo_real_users', [localNewUser, ...existing]);
+
+    return {
+      success: true,
+      message: 'Pendaftaran akun berhasil!',
+      data: { user: localNewUser, token: 'real-reg-token-' + localNewUser.id }
+    };
   },
 
   async changeOwnPassword(userId: string, currentPassword: string, newPassword: string): Promise<any> {
@@ -587,17 +873,25 @@ export const api = {
       } catch (err) {}
     }
 
-    return safeFetch('/auth/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, currentPassword, newPassword })
-    }, () => ({
+    const realUsers = getRealStorage<any[]>('azgo_real_users', []);
+    const updated = realUsers.map(u => u.id === userId ? { ...u, password: newPassword, updatedAt: new Date().toISOString() } : u);
+    setRealStorage('azgo_real_users', updated);
+
+    return {
       success: true,
       message: 'Password berhasil diubah!'
-    }));
+    };
   },
 
   async getAdminUsers(): Promise<any> {
+    if (isCurrentDemoMode()) {
+      return {
+        success: true,
+        data: MOCK_USERS
+      };
+    }
+
+    // Mode Real: Ambil data pengguna nyata dari Supabase
     const sb = getSupabase();
     if (sb) {
       try {
@@ -620,17 +914,36 @@ export const api = {
       } catch (err) {}
     }
 
-    return safeFetch('/auth/users', undefined, () => ({
+    // Fallback: Real storage (Hanya akun admin nyata, bukan akun demo Siti/Rudi)
+    const localReal = getRealStorage<any[]>('azgo_real_users', []);
+    if (localReal.length > 0) {
+      return { success: true, data: localReal };
+    }
+
+    const defaultAdminOnly = [
+      {
+        id: 'usr-admin-real',
+        email: 'admin@azgo.com',
+        phone: '081200000000',
+        fullName: 'Super Admin AzGo',
+        role: 'ADMIN' as UserRole,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+    setRealStorage('azgo_real_users', defaultAdminOnly);
+    return {
       success: true,
-      data: MOCK_USERS
-    }));
+      data: defaultAdminOnly
+    };
   },
 
   async createAdminUser(data: { email: string; phone: string; fullName: string; role: string; password?: string }): Promise<any> {
+    const role = (data.role || 'CUSTOMER') as UserRole;
     const sb = getSupabase();
     if (sb) {
       try {
-        const role = (data.role || 'CUSTOMER') as UserRole;
         const { data: newUser, error } = await sb.from('users').insert({
           email: data.email,
           phone: data.phone,
@@ -641,43 +954,45 @@ export const api = {
         }).select().single();
 
         if (newUser && !error) {
+          const userObj = {
+            id: newUser.id,
+            email: newUser.email,
+            phone: newUser.phone,
+            fullName: newUser.full_name,
+            role: newUser.role as UserRole,
+            isActive: newUser.is_active !== false,
+            createdAt: newUser.created_at,
+            updatedAt: newUser.updated_at
+          };
+          const existing = getRealStorage<any[]>('azgo_real_users', []);
+          setRealStorage('azgo_real_users', [userObj, ...existing]);
+
           return {
             success: true,
             message: 'User berhasil dibuat',
-            data: {
-              id: newUser.id,
-              email: newUser.email,
-              phone: newUser.phone,
-              fullName: newUser.full_name,
-              role: newUser.role as UserRole,
-              isActive: newUser.is_active !== false,
-              createdAt: newUser.created_at,
-              updatedAt: newUser.updated_at
-            }
+            data: userObj
           };
         }
       } catch (err) {}
     }
 
-    return safeFetch('/auth/create-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }, () => {
-      const role = (data.role || 'CUSTOMER') as UserRole;
-      return {
-        success: true,
-        message: 'User berhasil dibuat',
-        data: {
-          id: 'usr-' + Date.now(),
-          ...data,
-          role,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      };
-    });
+    const localUser = {
+      id: 'usr-' + Date.now(),
+      ...data,
+      role,
+      password: data.password || 'admin123',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const existing = getRealStorage<any[]>('azgo_real_users', []);
+    setRealStorage('azgo_real_users', [localUser, ...existing]);
+
+    return {
+      success: true,
+      message: 'User berhasil dibuat',
+      data: localUser
+    };
   },
 
   async adminResetPassword(targetUserId: string, newPassword: string): Promise<any> {
@@ -685,39 +1000,17 @@ export const api = {
     if (sb) {
       try {
         await sb.from('users').update({ password: newPassword, updated_at: new Date().toISOString() }).eq('id', targetUserId);
-        return { success: true, message: `Password berhasil direset menjadi: ${newPassword}` };
       } catch (err) {}
     }
 
-    return safeFetch('/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetUserId, newPassword })
-    }, () => ({
-      success: true,
-      message: 'Password berhasil direset'
-    }));
-  },
+    const realUsers = getRealStorage<any[]>('azgo_real_users', []);
+    const updated = realUsers.map(u => u.id === targetUserId ? { ...u, password: newPassword } : u);
+    setRealStorage('azgo_real_users', updated);
 
-  async toggleAdminDriver(driverId: string): Promise<any> {
-    return safeFetch(`/admin/drivers/${driverId}/toggle`, { method: 'PATCH' }, () => ({
+    return {
       success: true,
-      message: 'Status driver diperbarui'
-    }));
-  },
-
-  async toggleAdminMerchant(merchantId: string): Promise<any> {
-    return safeFetch(`/admin/merchants/${merchantId}/toggle`, { method: 'PATCH' }, () => ({
-      success: true,
-      message: 'Status merchant diperbarui'
-    }));
-  },
-
-  async toggleAdminHub(hubId: string): Promise<any> {
-    return safeFetch(`/admin/hubs/${hubId}/toggle`, { method: 'PATCH' }, () => ({
-      success: true,
-      message: 'Status hub diperbarui'
-    }));
+      message: `Password berhasil direset menjadi: ${newPassword}`
+    };
   },
 
   async toggleAdminUser(userId: string): Promise<any> {
@@ -741,19 +1034,21 @@ export const api = {
       } catch (err) {}
     }
 
-    return safeFetch(`/auth/users/${userId}/toggle`, { method: 'PATCH' }, () => {
-      const mock = MOCK_USERS.find(u => u.id === userId);
-      const newStatus = mock ? !mock.isActive : false;
-      return {
-        success: true,
-        message: 'Status user diperbarui',
-        data: {
-          id: userId,
-          fullName: mock?.fullName || 'User',
-          isActive: newStatus
-        }
-      };
-    });
+    const realUsers = getRealStorage<any[]>('azgo_real_users', []);
+    const target = realUsers.find(u => u.id === userId);
+    const newStatus = target ? !target.isActive : false;
+    const updated = realUsers.map(u => u.id === userId ? { ...u, isActive: newStatus } : u);
+    setRealStorage('azgo_real_users', updated);
+
+    return {
+      success: true,
+      message: `Akses user berhasil ${newStatus ? 'diaktifkan' : 'diblokir'}`,
+      data: {
+        id: userId,
+        fullName: target?.fullName || 'User',
+        isActive: newStatus
+      }
+    };
   },
 
   async getAdminServices(): Promise<any> {
@@ -776,19 +1071,39 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }, () => ({
-      success: true,
-      message: 'Pendaftaran mitra berhasil dikirim! Tim AzGo akan meninjau berkas Anda dalam 1x24 jam.',
-      data: { ...data, id: 'pa-' + Date.now(), status: 'PENDING_REVIEW', createdAt: new Date().toISOString() }
-    }));
+    }, () => {
+      const newApp = {
+        ...data,
+        id: 'pa-' + Date.now(),
+        status: 'PENDING_REVIEW',
+        createdAt: new Date().toISOString(),
+        submittedAt: new Date().toISOString()
+      };
+      if (!isCurrentDemoMode()) {
+        const apps = getRealStorage<any[]>('azgo_real_partner_applications', []);
+        setRealStorage('azgo_real_partner_applications', [newApp, ...apps]);
+      }
+      return {
+        success: true,
+        message: 'Pendaftaran mitra berhasil dikirim! Tim AzGo akan meninjau berkas Anda dalam 1x24 jam.',
+        data: newApp
+      };
+    });
   },
 
   async getPartnerApplications(status?: string, type?: string): Promise<any> {
     return safeFetch('/partner/applications', undefined, () => {
-      let apps = MOCK_PARTNER_APPLICATIONS;
-      if (status && status !== 'ALL') apps = apps.filter(a => a.status === status);
-      if (type && type !== 'ALL') apps = apps.filter(a => a.type === type);
-      return { success: true, data: apps };
+      if (isCurrentDemoMode()) {
+        let apps = MOCK_PARTNER_APPLICATIONS;
+        if (status && status !== 'ALL') apps = apps.filter(a => a.status === status);
+        if (type && type !== 'ALL') apps = apps.filter(a => a.type === type);
+        return { success: true, data: apps };
+      }
+
+      let realApps = getRealStorage<any[]>('azgo_real_partner_applications', []);
+      if (status && status !== 'ALL') realApps = realApps.filter(a => a.status === status);
+      if (type && type !== 'ALL') realApps = realApps.filter(a => a.type === type);
+      return { success: true, data: realApps };
     });
   },
 
@@ -797,19 +1112,45 @@ export const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, reason })
-    }, () => ({
-      success: true,
-      message: `Pendaftaran berhasil di-${action.toLowerCase()}`,
-      data: { id, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED' }
-    }));
+    }, () => {
+      if (!isCurrentDemoMode()) {
+        const apps = getRealStorage<any[]>('azgo_real_partner_applications', []);
+        const updated = apps.map(a => a.id === id ? { ...a, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED', rejectReason: reason } : a);
+        setRealStorage('azgo_real_partner_applications', updated);
+      }
+      return {
+        success: true,
+        message: `Pendaftaran berhasil di-${action === 'APPROVE' ? 'setujui' : 'tolak'}`,
+        data: { id, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED' }
+      };
+    });
   },
 
   // 11. KEUANGAN, BAGI HASIL, DAN PENARIKAN DANA
   async getFinanceSummary(): Promise<any> {
-    return safeFetch('/finance/admin/summary', undefined, () => ({
-      success: true,
-      data: MOCK_FINANCE_SUMMARY
-    }));
+    return safeFetch('/finance/admin/summary', undefined, () => {
+      if (isCurrentDemoMode()) {
+        return {
+          success: true,
+          data: MOCK_FINANCE_SUMMARY
+        };
+      }
+
+      const orders = getRealStorage<any[]>('azgo_real_admin_orders', []);
+      const totalGmv = orders.reduce((acc, o) => acc + (Number(o.totalAmount) || Number(o.totalCost) || 0), 0);
+      const platformRevenue = Math.round(totalGmv * 0.15);
+      return {
+        success: true,
+        data: {
+          totalGmv,
+          platformRevenue,
+          driverNetPayout: Math.round(totalGmv * 0.70),
+          merchantNetPayout: Math.round(totalGmv * 0.15),
+          pendingWithdrawals: 0,
+          completedOrdersCount: orders.length
+        }
+      };
+    });
   },
 
   async getCommissionConfig(): Promise<any> {
@@ -832,25 +1173,43 @@ export const api = {
   },
 
   async getPartnerWallet(partnerId: string, type: 'DRIVER' | 'MERCHANT' = 'DRIVER'): Promise<any> {
-    return safeFetch(`/finance/wallet/${partnerId}?type=${type}`, undefined, () => ({
-      success: true,
-      data: {
-        partnerId,
-        partnerType: type,
-        balance: type === 'DRIVER' ? 485000 : 1240000,
-        currentBalance: type === 'DRIVER' ? 485000 : 1240000,
-        totalWithdrawn: 1200000,
-        pendingWithdrawal: 0,
-        transactions: [
-          { id: 'tx-1', amount: 35000, type: 'EARNING', title: 'Komisi Order AZD-882910', date: new Date().toISOString() },
-          { id: 'tx-2', amount: 24000, type: 'EARNING', title: 'Komisi Order AZC-20260927', date: new Date(Date.now() - 3600000).toISOString() }
-        ],
-        recentTransactions: [
-          { id: 'tx-1', amount: 35000, type: 'EARNING', title: 'Komisi Order AZD-882910', date: new Date().toISOString() },
-          { id: 'tx-2', amount: 24000, type: 'EARNING', title: 'Komisi Order AZC-20260927', date: new Date(Date.now() - 3600000).toISOString() }
-        ]
+    return safeFetch(`/finance/wallet/${partnerId}?type=${type}`, undefined, () => {
+      if (isCurrentDemoMode()) {
+        return {
+          success: true,
+          data: {
+            partnerId,
+            partnerType: type,
+            balance: type === 'DRIVER' ? 485000 : 1240000,
+            currentBalance: type === 'DRIVER' ? 485000 : 1240000,
+            totalWithdrawn: 1200000,
+            pendingWithdrawal: 0,
+            transactions: [
+              { id: 'tx-1', amount: 35000, type: 'EARNING', title: 'Komisi Order AZD-882910', date: new Date().toISOString() },
+              { id: 'tx-2', amount: 24000, type: 'EARNING', title: 'Komisi Order AZC-20260927', date: new Date(Date.now() - 3600000).toISOString() }
+            ],
+            recentTransactions: [
+              { id: 'tx-1', amount: 35000, type: 'EARNING', title: 'Komisi Order AZD-882910', date: new Date().toISOString() },
+              { id: 'tx-2', amount: 24000, type: 'EARNING', title: 'Komisi Order AZC-20260927', date: new Date(Date.now() - 3600000).toISOString() }
+            ]
+          }
+        };
       }
-    }));
+
+      return {
+        success: true,
+        data: {
+          partnerId,
+          partnerType: type,
+          balance: 0,
+          currentBalance: 0,
+          totalWithdrawn: 0,
+          pendingWithdrawal: 0,
+          transactions: [],
+          recentTransactions: []
+        }
+      };
+    });
   },
 
   async requestWithdrawal(data: {
@@ -866,18 +1225,36 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }, () => ({
-      success: true,
-      message: 'Permintaan penarikan dana berhasil dikirim!',
-      data: { ...data, id: 'wdr-' + Date.now(), status: 'PENDING', createdAt: new Date().toISOString() }
-    }));
+    }, () => {
+      const newWd = {
+        ...data,
+        id: 'wdr-' + Date.now(),
+        status: 'PENDING',
+        createdAt: new Date().toISOString()
+      };
+      if (!isCurrentDemoMode()) {
+        const list = getRealStorage<any[]>('azgo_real_withdrawals', []);
+        setRealStorage('azgo_real_withdrawals', [newWd, ...list]);
+      }
+      return {
+        success: true,
+        message: 'Permintaan penarikan dana berhasil dikirim!',
+        data: newWd
+      };
+    });
   },
 
   async getWithdrawalRequests(status?: string): Promise<any> {
     return safeFetch('/finance/admin/withdrawals', undefined, () => {
-      let wd = MOCK_WITHDRAWALS;
-      if (status && status !== 'ALL') wd = wd.filter(w => w.status === status);
-      return { success: true, data: wd };
+      if (isCurrentDemoMode()) {
+        let wd = MOCK_WITHDRAWALS;
+        if (status && status !== 'ALL') wd = wd.filter(w => w.status === status);
+        return { success: true, data: wd };
+      }
+
+      let realWds = getRealStorage<any[]>('azgo_real_withdrawals', []);
+      if (status && status !== 'ALL') realWds = realWds.filter(w => w.status === status);
+      return { success: true, data: realWds };
     });
   },
 
@@ -886,10 +1263,17 @@ export const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, reason })
-    }, () => ({
-      success: true,
-      message: `Penarikan dana berhasil di-${action === 'APPROVE' ? 'setujui' : 'tolak'}`,
-      data: { id, status: action }
-    }));
+    }, () => {
+      if (!isCurrentDemoMode()) {
+        const list = getRealStorage<any[]>('azgo_real_withdrawals', []);
+        const updated = list.map(w => w.id === id ? { ...w, status: action, reason } : w);
+        setRealStorage('azgo_real_withdrawals', updated);
+      }
+      return {
+        success: true,
+        message: `Penarikan dana berhasil di-${action === 'APPROVE' ? 'setujui' : 'tolak'}`,
+        data: { id, status: action }
+      };
+    });
   }
 };

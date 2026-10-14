@@ -32,6 +32,7 @@ interface FoodOrderingProps {
   onRequestLogin?: (message: string, callback?: () => void) => void;
   onOrderCreated?: (order: CustomerOrder) => void;
   onTrackOrder?: (order: CustomerOrder) => void;
+  isDemoMode?: boolean;
 }
 
 export const FoodOrdering: React.FC<FoodOrderingProps> = ({ 
@@ -39,7 +40,8 @@ export const FoodOrdering: React.FC<FoodOrderingProps> = ({
   currentUser,
   onRequestLogin,
   onOrderCreated,
-  onTrackOrder
+  onTrackOrder,
+  isDemoMode = false
 }) => {
   const [deliveryType, setDeliveryType] = useState<'FOOD' | 'LOCAL_GOODS'>('FOOD');
   const [restaurants, setRestaurants] = useState<any[]>([]);
@@ -118,9 +120,11 @@ export const FoodOrdering: React.FC<FoodOrderingProps> = ({
     api.getRestaurants().then(res => {
       if (res.success && Array.isArray(res.data)) {
         setRestaurants(res.data.filter((r: any) => r.isActive !== false));
+      } else {
+        setRestaurants([]);
       }
     });
-  }, []);
+  }, [isDemoMode]);
 
   const totalCartCount = Object.values(cart).reduce((a, b) => a + b, 0);
 
@@ -559,6 +563,16 @@ export const FoodOrdering: React.FC<FoodOrderingProps> = ({
                   )}
                 </button>
               </div>
+            </div>
+          ) : restaurants.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-12 text-center shadow-sm max-w-xl mx-auto my-6">
+              <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">
+                🍽️
+              </div>
+              <h3 className="font-extrabold text-slate-800 text-base mb-1">Belum Ada Restoran Terdaftar</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Di Mode Real, data restoran masih kosong. Administrator dapat menambahkan mitra restoran baru melalui Dashboard Admin atau mitra dapat mendaftar di halaman depan.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

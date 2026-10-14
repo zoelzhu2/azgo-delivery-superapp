@@ -23,6 +23,7 @@ interface LoginModalProps {
   onSuccess: (user: User) => void;
   targetRoleMessage?: string;
   initialTab?: 'LOGIN' | 'REGISTER';
+  isDemoMode?: boolean;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
@@ -30,7 +31,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onClose,
   onSuccess,
   targetRoleMessage,
-  initialTab = 'LOGIN'
+  initialTab = 'LOGIN',
+  isDemoMode = false
 }) => {
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>(initialTab);
   
@@ -319,85 +321,97 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </form>
         )}
 
-        {/* 1-Click Quick Demo Accounts (Termasuk Pelanggan) */}
-        <div className="pt-2 border-t border-slate-100">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center mb-2">
-            ⚡ Quick Demo Login (Pilih Akun Instan)
-          </span>
+        {/* 1-Click Quick Demo Accounts (Hanya tampil di Mode Demo) */}
+        {isDemoMode ? (
+          <div className="pt-2 border-t border-slate-100">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center mb-2">
+              ⚡ Quick Demo Login (Pilih Akun Instan)
+            </span>
 
-          <div className="grid grid-cols-2 gap-1.5 text-xs">
-            {/* 1. PELANGGAN (CUSTOMER) */}
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('pelanggan@azgo.com', 'user123')}
-              className="p-2 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100 transition text-left flex items-center gap-2 col-span-2"
-            >
-              <div className="p-1.5 bg-rose-600 text-white rounded-lg">
-                <UserIcon className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <span className="font-extrabold text-rose-950 block leading-tight">Pelanggan Demo (Order Makanan/Barang)</span>
-                <span className="text-[10px] text-rose-700">Siti Rahma • 081299887766</span>
-              </div>
-            </button>
+            <div className="grid grid-cols-2 gap-1.5 text-xs">
+              {/* 1. PELANGGAN (CUSTOMER) */}
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('pelanggan@azgo.com', 'user123')}
+                className="p-2 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100 transition text-left flex items-center gap-2 col-span-2"
+              >
+                <div className="p-1.5 bg-rose-600 text-white rounded-lg">
+                  <UserIcon className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-rose-950 block leading-tight">Pelanggan Demo (Order Makanan/Barang)</span>
+                  <span className="text-[10px] text-rose-700">Siti Rahma • 081299887766</span>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('driver@azgo.com', 'driver123')}
-              className="p-2 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition text-left flex items-center gap-2"
-            >
-              <div className="p-1.5 bg-amber-500 text-slate-950 rounded-lg">
-                <Bike className="w-3.5 h-3.5" />
-              </div>
-              <div className="truncate">
-                <span className="font-extrabold text-slate-900 block leading-tight truncate">Driver</span>
-                <span className="text-[10px] text-slate-500">Rudi Hartono</span>
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('driver@azgo.com', 'driver123')}
+                className="p-2 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition text-left flex items-center gap-2"
+              >
+                <div className="p-1.5 bg-amber-500 text-slate-950 rounded-lg">
+                  <Bike className="w-3.5 h-3.5" />
+                </div>
+                <div className="truncate">
+                  <span className="font-extrabold text-slate-900 block leading-tight truncate">Driver</span>
+                  <span className="text-[10px] text-slate-500">Rudi Hartono</span>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('resto@azgo.com', 'resto123')}
-              className="p-2 rounded-xl border border-slate-200 hover:border-emerald-600 hover:bg-emerald-50 transition text-left flex items-center gap-2"
-            >
-              <div className="p-1.5 bg-emerald-600 text-white rounded-lg">
-                <Store className="w-3.5 h-3.5" />
-              </div>
-              <div className="truncate">
-                <span className="font-extrabold text-slate-900 block leading-tight truncate">Toko / Resto</span>
-                <span className="text-[10px] text-slate-500 truncate">Ayam Geprek</span>
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('resto@azgo.com', 'resto123')}
+                className="p-2 rounded-xl border border-slate-200 hover:border-emerald-600 hover:bg-emerald-50 transition text-left flex items-center gap-2"
+              >
+                <div className="p-1.5 bg-emerald-600 text-white rounded-lg">
+                  <Store className="w-3.5 h-3.5" />
+                </div>
+                <div className="truncate">
+                  <span className="font-extrabold text-slate-900 block leading-tight truncate">Toko / Resto</span>
+                  <span className="text-[10px] text-slate-500 truncate">Ayam Geprek</span>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('hub@azgo.com', 'hub123')}
-              className="p-2 rounded-xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50 transition text-left flex items-center gap-2"
-            >
-              <div className="p-1.5 bg-blue-600 text-white rounded-lg">
-                <Building2 className="w-3.5 h-3.5" />
-              </div>
-              <div className="truncate">
-                <span className="font-extrabold text-slate-900 block leading-tight truncate">Staff Hub</span>
-                <span className="text-[10px] text-slate-500 truncate">Gateway JKT</span>
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('hub@azgo.com', 'hub123')}
+                className="p-2 rounded-xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50 transition text-left flex items-center gap-2"
+              >
+                <div className="p-1.5 bg-blue-600 text-white rounded-lg">
+                  <Building2 className="w-3.5 h-3.5" />
+                </div>
+                <div className="truncate">
+                  <span className="font-extrabold text-slate-900 block leading-tight truncate">Staff Hub</span>
+                  <span className="text-[10px] text-slate-500 truncate">Gateway JKT</span>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('admin@azgo.com', 'admin123')}
-              className="p-2 rounded-xl border border-slate-200 hover:border-slate-900 hover:bg-slate-50 transition text-left flex items-center gap-2"
-            >
-              <div className="p-1.5 bg-slate-900 text-white rounded-lg">
-                <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
-              </div>
-              <div className="truncate">
-                <span className="font-extrabold text-slate-900 block leading-tight truncate">Admin</span>
-                <span className="text-[10px] text-slate-500 truncate">Super Admin</span>
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('admin@azgo.com', 'admin123')}
+                className="p-2 rounded-xl border border-slate-200 hover:border-slate-900 hover:bg-slate-50 transition text-left flex items-center gap-2"
+              >
+                <div className="p-1.5 bg-slate-900 text-white rounded-lg">
+                  <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
+                </div>
+                <div className="truncate">
+                  <span className="font-extrabold text-slate-900 block leading-tight truncate">Admin</span>
+                  <span className="text-[10px] text-slate-500 truncate">Super Admin</span>
+                </div>
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="pt-3 border-t border-slate-100 text-center space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Mode Data Nyata (Operasional Resmi)
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Masuk dengan akun terdaftar, atau login Administrator dengan username <strong>admin</strong>.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

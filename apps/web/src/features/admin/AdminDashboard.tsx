@@ -45,6 +45,7 @@ interface AdminDashboardProps {
   onLogout?: () => void;
   onChangePassword?: () => void;
   onServicesUpdated?: () => void;
+  isDemoMode?: boolean;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -52,7 +53,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   currentUser,
   onLogout,
   onChangePassword,
-  onServicesUpdated
+  onServicesUpdated,
+  isDemoMode = false
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'pricing' | 'drivers' | 'merchants' | 'hubs' | 'users' | 'partners' | 'finance' | 'services' | 'qris'>('orders');
   const [metrics, setMetrics] = useState<any>(null);
@@ -174,7 +176,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [serviceFilter]);
+  }, [serviceFilter, isDemoMode]);
 
   useEffect(() => {
     try {
@@ -771,25 +773,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {orders.map(o => (
-                  <tr key={o.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">{o.orderNumber}</td>
-                    <td className="py-3 px-4">{getServiceBadge(o.serviceType)}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{o.customerName}</td>
-                    <td className="py-3 px-4 text-slate-600">{o.driverName}</td>
-                    <td className="py-3 px-4 text-[11px] text-slate-500 max-w-xs truncate">
-                      {o.pickup} → {o.dropoff}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                        {o.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right font-black text-slate-900">
-                      {o.totalAmount > 0 ? `Rp ${o.totalAmount.toLocaleString('id-ID')}` : 'Gratis Jemput'}
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-2 text-2xl">
+                        📦
+                      </div>
+                      <p className="font-bold text-slate-700 text-sm">Belum ada pesanan masuk</p>
+                      <p className="text-xs text-slate-500 mt-1">Pesanan pelanggan yang masuk secara langsung akan tampil otomatis di sini.</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  orders.map(o => (
+                    <tr key={o.id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-900">{o.orderNumber}</td>
+                      <td className="py-3 px-4">{getServiceBadge(o.serviceType)}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-800">{o.customerName}</td>
+                      <td className="py-3 px-4 text-slate-600">{o.driverName}</td>
+                      <td className="py-3 px-4 text-[11px] text-slate-500 max-w-xs truncate">
+                        {o.pickup} → {o.dropoff}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          {o.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-black text-slate-900">
+                        {o.totalAmount > 0 ? `Rp ${o.totalAmount.toLocaleString('id-ID')}` : 'Gratis Jemput'}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -931,54 +945,68 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="divide-y divide-slate-100">
-            {drivers.map(d => (
-              <div key={d.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 text-sm">{d.name}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      d.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {d.isActive !== false ? '🟢 Akun Aktif' : '🔴 Ditangguhkan'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      d.isOnline ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {d.isOnline ? 'Online' : 'Offline'}
-                    </span>
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-                      {d.role}
-                    </span>
-                  </div>
-                  <p className="text-slate-500 mt-0.5">Armada: <strong>{d.vehicle}</strong> • Kontak: {d.phone}</p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleToggleDriver(d.id)}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 ${
-                      d.isActive !== false 
-                        ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200' 
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                    }`}
-                  >
-                    {d.isActive !== false ? <><Ban className="w-3.5 h-3.5" /> Nonaktifkan</> : <><Power className="w-3.5 h-3.5" /> Aktifkan</>}
-                  </button>
-                  {d.status === 'VERIFIED' ? (
-                    <span className="flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Terverifikasi
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleVerify(d.id)}
-                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition"
-                    >
-                      Verifikasi Akun
-                    </button>
-                  )}
-                </div>
+            {drivers.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                <Bike className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <p className="font-bold text-slate-700 text-sm">Belum ada mitra driver terdaftar</p>
+                <p className="text-xs text-slate-500 mt-1 mb-4">Tambahkan armada driver pertama Anda atau setujui pendaftaran mitra baru.</p>
+                <button
+                  onClick={() => setShowDriverModal(true)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition"
+                >
+                  <Plus className="w-4 h-4" /> Tambah Mitra Pengemudi
+                </button>
               </div>
-            ))}
+            ) : (
+              drivers.map(d => (
+                <div key={d.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 text-sm">{d.name}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        d.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {d.isActive !== false ? '🟢 Akun Aktif' : '🔴 Ditangguhkan'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        d.isOnline ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {d.isOnline ? 'Online' : 'Offline'}
+                      </span>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                        {d.role}
+                      </span>
+                    </div>
+                    <p className="text-slate-500 mt-0.5">Armada: <strong>{d.vehicle}</strong> • Kontak: {d.phone}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleDriver(d.id)}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 ${
+                        d.isActive !== false 
+                          ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200' 
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                      }`}
+                    >
+                      {d.isActive !== false ? <><Ban className="w-3.5 h-3.5" /> Nonaktifkan</> : <><Power className="w-3.5 h-3.5" /> Aktifkan</>}
+                    </button>
+                    {d.status === 'VERIFIED' ? (
+                      <span className="flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Terverifikasi
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleVerify(d.id)}
+                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition"
+                      >
+                        Verifikasi Akun
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -1000,41 +1028,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            {merchants.map(m => (
-              <div key={m.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-2 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
-                      m.type === 'FOOD' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {m.type === 'FOOD' ? '🛵 Restoran Az Delivery' : '🛒 Minimarket Az Mart'}
-                    </span>
-                    <span className="text-amber-600 font-bold">★ {m.rating}</span>
-                  </div>
-                  <h4 className="font-bold text-slate-900 text-sm">{m.name}</h4>
-                  <p className="text-slate-500">{m.category} • {m.address}</p>
-                </div>
-
-                <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-600 flex items-center justify-between">
-                  <span className="font-semibold">{m.items?.length || 0} Menu/Produk Terdaftar</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                      m.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {m.isActive !== false ? '🟢 Toko Aktif' : '🔴 Toko Tutup'}
-                    </span>
-                    <button
-                      onClick={() => handleToggleMerchant(m.id)}
-                      className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition flex items-center gap-1 ${
-                        m.isActive !== false ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-                      }`}
-                    >
-                      {m.isActive !== false ? <><Ban className="w-3 h-3" /> Nonaktifkan</> : <><Power className="w-3 h-3" /> Aktifkan</>}
-                    </button>
-                  </div>
-                </div>
+            {merchants.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                <Store className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <p className="font-bold text-slate-700 text-sm">Belum ada mitra toko atau resto terdaftar</p>
+                <p className="text-xs text-slate-500 mt-1 mb-4">Tambahkan restoran atau minimarket mart pertama Anda untuk mulai melayani pelanggan.</p>
+                <button
+                  onClick={() => setShowMerchantModal(true)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition"
+                >
+                  <Plus className="w-4 h-4" /> Tambah Toko / Resto
+                </button>
               </div>
-            ))}
+            ) : (
+              merchants.map(m => (
+                <div key={m.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                        m.type === 'FOOD' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {m.type === 'FOOD' ? '🛵 Restoran Az Delivery' : '🛒 Minimarket Az Mart'}
+                      </span>
+                      <span className="text-amber-600 font-bold">★ {m.rating}</span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-sm">{m.name}</h4>
+                    <p className="text-slate-500">{m.category} • {m.address}</p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-600 flex items-center justify-between">
+                    <span className="font-semibold">{m.items?.length || 0} Menu/Produk Terdaftar</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                        m.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {m.isActive !== false ? '🟢 Toko Aktif' : '🔴 Toko Tutup'}
+                      </span>
+                      <button
+                        onClick={() => handleToggleMerchant(m.id)}
+                        className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition flex items-center gap-1 ${
+                          m.isActive !== false ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        }`}
+                      >
+                        {m.isActive !== false ? <><Ban className="w-3 h-3" /> Nonaktifkan</> : <><Power className="w-3 h-3" /> Aktifkan</>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -1056,33 +1098,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            {hubs.map(h => (
-              <div key={h.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1">
-                <div className="flex justify-between items-center mb-1">
-                  <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
-                    h.hubType === 'DROP_POINT' ? 'bg-blue-100 text-blue-800' : 'bg-indigo-100 text-indigo-800'
-                  }`}>
-                    {h.hubType}
-                  </span>
-                  <span className="font-mono font-bold text-slate-500">{h.hubCode}</span>
-                </div>
-                <h4 className="font-bold text-slate-900 text-sm">{h.name}</h4>
-                <p className="text-slate-500">{h.address}, {h.city}</p>
-                <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-                  <span className={`text-[11px] font-bold ${h.isActive !== false ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {h.isActive !== false ? '● Beroperasi Normal' : '● Cabang Nonaktif'}
-                  </span>
-                  <button
-                    onClick={() => handleToggleHub(h.id)}
-                    className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition flex items-center gap-1 ${
-                      h.isActive !== false ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-                    }`}
-                  >
-                    {h.isActive !== false ? <><Ban className="w-3 h-3" /> Nonaktifkan</> : <><Power className="w-3 h-3" /> Aktifkan</>}
-                  </button>
-                </div>
+            {hubs.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                <MapPin className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <p className="font-bold text-slate-700 text-sm">Belum ada hub atau drop point terdaftar</p>
+                <p className="text-xs text-slate-500 mt-1 mb-4">Tambahkan cabang atau gerai drop point pertama untuk jaringan logistik AzGo.</p>
+                <button
+                  onClick={() => setShowHubModal(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition"
+                >
+                  <Plus className="w-4 h-4" /> Tambah Cabang Hub / Agen
+                </button>
               </div>
-            ))}
+            ) : (
+              hubs.map(h => (
+                <div key={h.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                      h.hubType === 'DROP_POINT' ? 'bg-blue-100 text-blue-800' : 'bg-indigo-100 text-indigo-800'
+                    }`}>
+                      {h.hubType}
+                    </span>
+                    <span className="font-mono font-bold text-slate-500">{h.hubCode}</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm">{h.name}</h4>
+                  <p className="text-slate-500">{h.address}, {h.city}</p>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                    <span className={`text-[11px] font-bold ${h.isActive !== false ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {h.isActive !== false ? '● Beroperasi Normal' : '● Cabang Nonaktif'}
+                    </span>
+                    <button
+                      onClick={() => handleToggleHub(h.id)}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition flex items-center gap-1 ${
+                        h.isActive !== false ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      }`}
+                    >
+                      {h.isActive !== false ? <><Ban className="w-3 h-3" /> Nonaktifkan</> : <><Power className="w-3 h-3" /> Aktifkan</>}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -1278,99 +1334,114 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {partnerApplications
                   .filter(app => partnerStatusFilter === 'ALL' || app.status === partnerStatusFilter)
                   .filter(app => partnerTypeFilter === 'ALL' || app.type === partnerTypeFilter)
-                  .map(app => (
-                    <tr key={app.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-3 px-4">
-                        <span className="font-mono font-bold text-slate-900 block">{app.id}</span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(app.submittedAt).toLocaleDateString('id-ID')}
-                        </span>
+                  .length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-2 text-2xl">
+                          📋
+                        </div>
+                        <p className="font-bold text-slate-700 text-sm">Belum ada pengajuan pendaftaran mitra</p>
+                        <p className="text-xs text-slate-500 mt-1">Calon mitra pengemudi atau toko yang mendaftar akan otomatis masuk ke tabel ini untuk ditinjau.</p>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{app.fullName}</div>
-                        <div className="text-slate-500 text-[11px]">{app.phone} • {app.city}</div>
-                        <div className="text-slate-400 text-[10px] font-mono">{app.email}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {app.type === 'DRIVER' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 inline-flex items-center gap-1">
-                            <Bike className="w-3 h-3 text-amber-700" /> Driver ({app.vehicleCategory})
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-900 inline-flex items-center gap-1">
-                            <Store className="w-3 h-3 text-emerald-700" /> {app.merchantType === 'FOOD' ? 'Resto' : 'Mart'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-[11px] text-slate-700">
-                        {app.type === 'DRIVER' ? (
-                          <div>
-                            <span className="font-bold text-slate-900">{app.vehicleModel}</span>
-                            <span className="block font-mono text-slate-500">{app.vehiclePlate}</span>
-                          </div>
-                        ) : (
-                          <div>
-                            <span className="font-bold text-slate-900">{app.storeName}</span>
-                            <span className="block text-slate-500">{app.storeCategory}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => {
-                            setSelectedApp(app);
-                            setShowAppDetailModal(true);
-                          }}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition"
-                        >
-                          <Eye className="w-3 h-3 text-slate-500" /> Tinjau Berkas
-                        </button>
-                      </td>
-                      <td className="py-3 px-4">
-                        {app.status === 'PENDING_REVIEW' && (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                            Menunggu Review
-                          </span>
-                        )}
-                        {app.status === 'APPROVED' && (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Disetujui
-                          </span>
-                        )}
-                        {app.status === 'REJECTED' && (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                            Ditolak
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        {app.status === 'PENDING_REVIEW' ? (
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              onClick={() => handleApproveApplication(app.id)}
-                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[11px] shadow-sm transition inline-flex items-center gap-1"
-                            >
-                              <Check className="w-3 h-3" /> Setujui
-                            </button>
+                    </tr>
+                  ) : (
+                    partnerApplications
+                      .filter(app => partnerStatusFilter === 'ALL' || app.status === partnerStatusFilter)
+                      .filter(app => partnerTypeFilter === 'ALL' || app.type === partnerTypeFilter)
+                      .map(app => (
+                        <tr key={app.id} className="hover:bg-slate-50/80 transition">
+                          <td className="py-3 px-4">
+                            <span className="font-mono font-bold text-slate-900 block">{app.id}</span>
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(app.submittedAt).toLocaleDateString('id-ID')}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900">{app.fullName}</div>
+                            <div className="text-slate-500 text-[11px]">{app.phone} • {app.city}</div>
+                            <div className="text-slate-400 text-[10px] font-mono">{app.email}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {app.type === 'DRIVER' ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 inline-flex items-center gap-1">
+                                <Bike className="w-3 h-3 text-amber-700" /> Driver ({app.vehicleCategory})
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-900 inline-flex items-center gap-1">
+                                <Store className="w-3 h-3 text-emerald-700" /> {app.merchantType === 'FOOD' ? 'Resto' : 'Mart'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-[11px] text-slate-700">
+                            {app.type === 'DRIVER' ? (
+                              <div>
+                                <span className="font-bold text-slate-900">{app.vehicleModel}</span>
+                                <span className="block font-mono text-slate-500">{app.vehiclePlate}</span>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="font-bold text-slate-900">{app.storeName}</span>
+                                <span className="block text-slate-500">{app.storeCategory}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
                             <button
                               onClick={() => {
                                 setSelectedApp(app);
-                                setRejectNotes('');
-                                setShowRejectModal(true);
+                                setShowAppDetailModal(true);
                               }}
-                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-[11px] border border-rose-200 transition"
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition"
                             >
-                              Tolak
+                              <Eye className="w-3 h-3 text-slate-500" /> Tinjau Berkas
                             </button>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">
-                            {app.reviewedAt ? new Date(app.reviewedAt).toLocaleDateString('id-ID') : '-'}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          </td>
+                          <td className="py-3 px-4">
+                            {app.status === 'PENDING_REVIEW' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                Menunggu Review
+                              </span>
+                            )}
+                            {app.status === 'APPROVED' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Disetujui
+                              </span>
+                            )}
+                            {app.status === 'REJECTED' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+                                Ditolak
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {app.status === 'PENDING_REVIEW' ? (
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  onClick={() => handleApproveApplication(app.id)}
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[11px] shadow-sm transition inline-flex items-center gap-1"
+                                >
+                                  <Check className="w-3 h-3" /> Setujui
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedApp(app);
+                                    setRejectNotes('');
+                                    setShowRejectModal(true);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-[11px] border border-rose-200 transition"
+                                >
+                                  Tolak
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">
+                                {app.reviewedAt ? new Date(app.reviewedAt).toLocaleDateString('id-ID') : '-'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                  )}
               </tbody>
             </table>
           </div>
@@ -1605,75 +1676,89 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {withdrawalRequests
                     .filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter)
-                    .map(w => (
-                      <tr key={w.id} className="hover:bg-slate-50/80 transition">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{w.id}</td>
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-slate-900 block">{w.partnerName}</span>
-                          <span className="text-[10px] text-slate-500">{w.partnerType === 'DRIVER' ? 'Mitra Driver' : 'Mitra Toko'}</span>
-                        </td>
-                        <td className="py-3 px-4 font-black text-slate-900 text-sm">
-                          Rp {w.amount.toLocaleString('id-ID')}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-slate-800 block">{w.bankName} - {w.accountNumber}</span>
-                          <span className="text-[10px] text-slate-500">a/n {w.accountHolder}</span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-500 text-[11px]">
-                          {new Date(w.requestedAt).toLocaleString('id-ID')}
-                        </td>
-                        <td className="py-3 px-4">
-                          {w.status === 'PENDING' && (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                              Menunggu Transfer
-                            </span>
-                          )}
-                          {w.status === 'APPROVED' && (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              Berhasil Ditransfer
-                            </span>
-                          )}
-                          {w.status === 'REJECTED' && (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                              Ditolak (Refund)
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          {w.status === 'PENDING' ? (
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                onClick={() => {
-                                  setSelectedWithdrawal(w);
-                                  setWithdrawalActionType('APPROVE');
-                                  setTransferRefCode(`TRF-${Date.now().toString().slice(-6)}`);
-                                  setWithdrawalReviewNotes('');
-                                  setShowWithdrawalModal(true);
-                                }}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[11px] shadow-sm transition"
-                              >
-                                Setujui Transfer
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedWithdrawal(w);
-                                  setWithdrawalActionType('REJECT');
-                                  setWithdrawalReviewNotes('');
-                                  setShowWithdrawalModal(true);
-                                }}
-                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-[11px] border border-rose-200 transition"
-                              >
-                                Tolak
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {w.rejectionReason || (w.processedAt ? `Selesai ${new Date(w.processedAt).toLocaleDateString('id-ID')}` : '-')}
-                            </span>
-                          )}
+                    .length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                          <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-2 text-2xl">
+                            💰
+                          </div>
+                          <p className="font-bold text-slate-700 text-sm">Belum ada permintaan penarikan saldo</p>
+                          <p className="text-xs text-slate-500 mt-1">Permintaan pencairan dana (withdraw) dari mitra driver atau resto akan tampil di sini.</p>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      withdrawalRequests
+                        .filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter)
+                        .map(w => (
+                          <tr key={w.id} className="hover:bg-slate-50/80 transition">
+                            <td className="py-3 px-4 font-mono font-bold text-slate-900">{w.id}</td>
+                            <td className="py-3 px-4">
+                              <span className="font-bold text-slate-900 block">{w.partnerName}</span>
+                              <span className="text-[10px] text-slate-500">{w.partnerType === 'DRIVER' ? 'Mitra Driver' : 'Mitra Toko'}</span>
+                            </td>
+                            <td className="py-3 px-4 font-black text-slate-900 text-sm">
+                              Rp {w.amount.toLocaleString('id-ID')}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-bold text-slate-800 block">{w.bankName} - {w.accountNumber}</span>
+                              <span className="text-[10px] text-slate-500">a/n {w.accountHolder}</span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-500 text-[11px]">
+                              {new Date(w.requestedAt).toLocaleString('id-ID')}
+                            </td>
+                            <td className="py-3 px-4">
+                              {w.status === 'PENDING' && (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                  Menunggu Transfer
+                                </span>
+                              )}
+                              {w.status === 'APPROVED' && (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  Berhasil Ditransfer
+                                </span>
+                              )}
+                              {w.status === 'REJECTED' && (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+                                  Ditolak (Refund)
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              {w.status === 'PENDING' ? (
+                                <div className="inline-flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedWithdrawal(w);
+                                      setWithdrawalActionType('APPROVE');
+                                      setTransferRefCode(`TRF-${Date.now().toString().slice(-6)}`);
+                                      setWithdrawalReviewNotes('');
+                                      setShowWithdrawalModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[11px] shadow-sm transition"
+                                  >
+                                    Setujui Transfer
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedWithdrawal(w);
+                                      setWithdrawalActionType('REJECT');
+                                      setWithdrawalReviewNotes('');
+                                      setShowWithdrawalModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-[11px] border border-rose-200 transition"
+                                  >
+                                    Tolak
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {w.rejectionReason || (w.processedAt ? `Selesai ${new Date(w.processedAt).toLocaleDateString('id-ID')}` : '-')}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                    )}
                 </tbody>
               </table>
             </div>

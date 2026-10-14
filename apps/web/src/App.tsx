@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, PartnerType } from '@delivery/shared';
-import { api } from './services/apiClient';
+import { api, setApiDemoMode } from './services/apiClient';
 import { Navbar } from './components/Navbar';
 import { ServiceGrid } from './components/ServiceGrid';
 import { FoodOrdering } from './features/food/FoodOrdering';
@@ -78,31 +78,84 @@ export const App: React.FC = () => {
   );
 
   // Mode Aplikasi: Demo vs Real (Live)
-  // Jika VITE_APP_MODE='production', fitur demo dinonaktifkan total untuk link live operasional
-  const isProductionDeployment = (import.meta as any).env?.VITE_APP_MODE === 'production';
+  // Default untuk web operasional: Mode Real (Data Bersih, belum ada data demo)
+  // Mode Demo aktif jika URL memiliki param ?mode=demo atau ?demo=true, atau diaktifkan manual
   const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
-    if (isProductionDeployment) return false;
-    const saved = localStorage.getItem('azgo_demo_mode');
-    return saved !== null ? saved === 'true' : true;
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get('demo') === 'true' || searchParams.get('demo') === '1' || searchParams.get('mode') === 'demo') {
+        return true;
+      }
+      if (searchParams.get('real') === 'true' || searchParams.get('real') === '1' || searchParams.get('mode') === 'real') {
+        return false;
+      }
+      const saved = localStorage.getItem('azgo_demo_mode');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    }
+    return false; // Default: Mode Real (Data Bersih)
   });
+
+  useEffect(() => {
+    setApiDemoMode(isDemoMode);
+  }, [isDemoMode]);
+
+  // Jika berpindah ke Mode Real, bersihkan sesi jika sebelumnya sedang login akun demo instan
+  useEffect(() => {
+    if (!isDemoMode && currentUser) {
+      const isDemoUser = ['usr-cust-1', 'usr-drv-1', 'usr-merch-1', 'usr-mart-1', 'usr-hub-1', 'usr-admin-1'].includes(currentUser.id) ||
+        currentUser.email === 'pelanggan@azgo.com' ||
+        currentUser.email === 'driver@azgo.com' ||
+        currentUser.email === 'resto@azgo.com' ||
+        currentUser.email === 'mart@azgo.com' ||
+        currentUser.email === 'hub@azgo.com';
+      if (isDemoUser) {
+        setCurrentUser(null);
+        localStorage.removeItem('azgo_user');
+      }
+    }
+  }, [isDemoMode, currentUser]);
 
   const handleToggleDemoMode = (enabled: boolean) => {
     setIsDemoMode(enabled);
     localStorage.setItem('azgo_demo_mode', String(enabled));
+    setApiDemoMode(enabled);
   };
 
-  // Customer Order Tracking State
+  // Customer Order Tracking State (Mode Real bersih [], Mode Demo DEFAULT_DEMO_ORDERS)
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>(() => {
     try {
-      const saved = localStorage.getItem('azgo_customer_orders');
+      const key = isDemoMode ? 'azgo_customer_orders' : 'azgo_real_customer_orders';
+      const saved = localStorage.getItem(key);
       if (saved) return JSON.parse(saved);
     } catch {}
-    return DEFAULT_DEMO_ORDERS;
+    return isDemoMode ? DEFAULT_DEMO_ORDERS : [];
   });
 
+  useEffect(() => {
+    try {
+      const key = isDemoMode ? 'azgo_customer_orders' : 'azgo_real_customer_orders';
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setCustomerOrders(JSON.parse(saved));
+      } else {
+        setCustomerOrders(isDemoMode ? DEFAULT_DEMO_ORDERS : []);
+      }
+    } catch {
+      setCustomerOrders(isDemoMode ? DEFAULT_DEMO_ORDERS : []);
+    }
+  }, [isDemoMode]);
+
   const handleResetDemoData = () => {
-    setCustomerOrders(DEFAULT_DEMO_ORDERS);
-    localStorage.setItem('azgo_customer_orders', JSON.stringify(DEFAULT_DEMO_ORDERS));
+    if (isDemoMode) {
+      setCustomerOrders(DEFAULT_DEMO_ORDERS);
+      localStorage.setItem('azgo_customer_orders', JSON.stringify(DEFAULT_DEMO_ORDERS));
+    } else {
+      setCustomerOrders([]);
+      localStorage.setItem('azgo_real_customer_orders', JSON.stringify([]));
+      localStorage.removeItem('azgo_real_admin_orders');
+    }
   };
 
   const handleQuickLogin = async (email: string, pass: string) => {
@@ -144,14 +197,30 @@ export const App: React.FC = () => {
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<CustomerOrder | null>(null);
   const [showTrackingModal, setShowTrackingModal] = useState<boolean>(false);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('azgo_customer_orders', JSON.stringify(customerOrders));
-    } catch {}
-  }, [customerOrders]);
-
   const handleOrderCreated = (order: CustomerOrder) => {
     setCustomerOrders(prev => [order, ...prev.filter(o => o.orderNumber !== order.orderNumber)]);
+    if (!isDemoMode) {
+      try {
+        const rawAdmin = localStorage.getItem('azgo_real_admin_orders');
+        const realAdminOrders = rawAdmin ? JSON.parse(rawAdmin) : [];
+        const adminOrderObj = {
+          id: 'ord-' + Date.now(),
+          orderNumber: order.orderNumber,
+          trackingNumber: order.orderNumber,
+          serviceType: order.serviceType,
+          serviceName: order.serviceName,
+          customerName: order.customerName || currentUser?.fullName || 'Pelanggan AzGo',
+          customerPhone: order.customerPhone || currentUser?.phone || '',
+          driverName: 'Menunggu Driver',
+          pickup: order.pickupAddress || 'Lokasi Jemput',
+          dropoff: order.dropoffAddress || 'Alamat Antar',
+          status: 'ORDER_CREATED',
+          totalAmount: order.totalAmount || 0,
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem('azgo_real_admin_orders', JSON.stringify([adminOrderObj, ...realAdminOrders]));
+      } catch {}
+    }
   };
 
   const handleTrackOrder = (order: CustomerOrder) => {
@@ -296,15 +365,13 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      {!isProductionDeployment && (
-        <DemoBanner
-          isDemoMode={isDemoMode}
-          onToggleDemoMode={handleToggleDemoMode}
-          onQuickLogin={handleQuickLogin}
-          onResetDemoData={handleResetDemoData}
-          currentUser={currentUser}
-        />
-      )}
+      <DemoBanner
+        isDemoMode={isDemoMode}
+        onToggleDemoMode={handleToggleDemoMode}
+        onQuickLogin={handleQuickLogin}
+        onResetDemoData={handleResetDemoData}
+        currentUser={currentUser}
+      />
 
       <Navbar
         activeTab={activeTab}
@@ -312,7 +379,7 @@ export const App: React.FC = () => {
         onQuickTrack={handleQuickTrack}
         currentUser={currentUser}
         canTrack={canTrack}
-        isDemoMode={!isProductionDeployment && isDemoMode}
+        isDemoMode={isDemoMode}
         onLoginClick={() => {
           setLoginTargetMessage('');
           setShowLoginModal(true);
@@ -346,6 +413,7 @@ export const App: React.FC = () => {
           <FoodOrdering 
             onBack={() => setActiveTab('home')} 
             currentUser={currentUser}
+            isDemoMode={isDemoMode}
             onRequestLogin={handleRequestLogin}
             onOrderCreated={handleOrderCreated}
             onTrackOrder={handleTrackOrder}
@@ -398,6 +466,7 @@ export const App: React.FC = () => {
           <MartShopping 
             onBack={() => setActiveTab('home')} 
             currentUser={currentUser}
+            isDemoMode={isDemoMode}
             onRequestLogin={handleRequestLogin}
             onOrderCreated={handleOrderCreated}
             onTrackOrder={handleTrackOrder}
@@ -490,8 +559,9 @@ export const App: React.FC = () => {
         {/* ================= 5. SISI ADMINISTRATOR (BACKOFFICE) ================= */}
         {activeTab === 'admin' && (
           <AdminDashboard 
-            onBack={() => setActiveTab('home')}
+            onBack={() => setActiveTab('home')} 
             currentUser={currentUser}
+            isDemoMode={isDemoMode}
             onLogout={handleLogout}
             onChangePassword={() => setShowChangePasswordModal(true)}
             onServicesUpdated={fetchServices}
@@ -551,6 +621,7 @@ export const App: React.FC = () => {
         onClose={() => setShowLoginModal(false)}
         onSuccess={handleLoginSuccess}
         targetRoleMessage={loginTargetMessage}
+        isDemoMode={isDemoMode}
       />
 
       <ChangePasswordModal
