@@ -37,8 +37,9 @@ export interface PartnerApplication {
   storeCategory?: string;
   storeDescription?: string;
 
-  // Opsi Kurir Mandiri untuk Merchant (Toko / Resto)
+  // Opsi Kurir Mandiri & Pengantaran untuk Merchant (Toko / Resto)
   hasSelfCourier?: boolean;
+  deliveryOption?: 'AZGO_ONLY' | 'SELF_ONLY' | 'BOTH';
   selfCourierName?: string;
   selfCourierPhone?: string;
   selfCourierVehicle?: string;

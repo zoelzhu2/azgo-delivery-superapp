@@ -1382,6 +1382,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <div>
                                 <span className="font-bold text-slate-900">{app.storeName}</span>
                                 <span className="block text-slate-500">{app.storeCategory}</span>
+                                {app.deliveryOption === 'BOTH' ? (
+                                  <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-bold border border-indigo-200">
+                                    🛵+🏪 Keduanya (Kurir + AzGo)
+                                  </span>
+                                ) : app.deliveryOption === 'SELF_ONLY' ? (
+                                  <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[9px] font-bold border border-amber-200">
+                                    🏪 Kurir Mandiri
+                                  </span>
+                                ) : (
+                                  <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[9px] font-bold border border-emerald-200">
+                                    🛵 Driver AzGo Saja
+                                  </span>
+                                )}
                               </div>
                             )}
                           </td>
@@ -2528,6 +2541,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span className="text-slate-400 block font-medium">Kategori Usaha:</span>
                     <span className="font-bold text-slate-900">{selectedApp.storeCategory}</span>
                   </div>
+                  <div>
+                    <span className="text-slate-400 block font-medium">Opsi Pengantaran:</span>
+                    <span className="font-bold text-slate-900">
+                      {selectedApp.deliveryOption === 'BOTH'
+                        ? '🛵+🏪 Keduanya (Kurir Toko + Driver AzGo)'
+                        : selectedApp.deliveryOption === 'SELF_ONLY'
+                        ? '🏪 Kurir Mandiri Saja'
+                        : '🛵 Driver AzGo Saja'}
+                    </span>
+                  </div>
+                  {selectedApp.hasSelfCourier && (
+                    <div className="col-span-1 sm:col-span-2 p-2.5 bg-amber-50 rounded-xl border border-amber-200">
+                      <span className="text-amber-900 font-extrabold text-[11px] block">
+                        Kurir Mandiri Toko:
+                      </span>
+                      <span className="text-slate-700 text-xs">
+                        {selectedApp.selfCourierName || 'Kurir Toko'} ({selectedApp.selfCourierPhone}) • {selectedApp.selfCourierVehicle || 'Motor'} ({selectedApp.selfCourierPlate})
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
