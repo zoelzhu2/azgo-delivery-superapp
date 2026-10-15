@@ -150,29 +150,35 @@ export const Navbar: React.FC<NavbarProps> = ({
               Toko
             </button>
 
-            <button
-              onClick={() => setActiveTab('hub-portal')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shrink-0 ${
-                activeTab === 'hub-portal'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              Hub
-            </button>
+            {/* Hub Portal: Hanya tampil jika pengguna login sebagai Hub Staff atau Super Admin */}
+            {currentUser && (currentUser.role === 'HUB_STAFF' || currentUser.role === 'ADMIN') && (
+              <button
+                onClick={() => setActiveTab('hub-portal')}
+                className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'hub-portal'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                Hub
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shrink-0 ${
-                activeTab === 'admin'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
-              Admin
-            </button>
+            {/* Admin Control Tower: HANYA tampil jika login sebagai ADMIN */}
+            {currentUser?.role === 'ADMIN' && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'admin'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
+                Admin
+              </button>
+            )}
           </div>
 
           {/* User Auth Section */}

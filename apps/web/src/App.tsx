@@ -365,13 +365,16 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      <DemoBanner
-        isDemoMode={isDemoMode}
-        onToggleDemoMode={handleToggleDemoMode}
-        onQuickLogin={handleQuickLogin}
-        onResetDemoData={handleResetDemoData}
-        currentUser={currentUser}
-      />
+      {/* Demo Banner HANYA tampil jika sedang di Mode Demo ATAU jika login sebagai ADMIN */}
+      {(isDemoMode || currentUser?.role === 'ADMIN') && (
+        <DemoBanner
+          isDemoMode={isDemoMode}
+          onToggleDemoMode={handleToggleDemoMode}
+          onQuickLogin={handleQuickLogin}
+          onResetDemoData={handleResetDemoData}
+          currentUser={currentUser}
+        />
+      )}
 
       <Navbar
         activeTab={activeTab}
@@ -558,22 +561,63 @@ export const App: React.FC = () => {
 
         {/* ================= 5. SISI ADMINISTRATOR (BACKOFFICE) ================= */}
         {activeTab === 'admin' && (
-          <AdminDashboard 
-            onBack={() => setActiveTab('home')} 
-            currentUser={currentUser}
-            isDemoMode={isDemoMode}
-            onLogout={handleLogout}
-            onChangePassword={() => setShowChangePasswordModal(true)}
-            onServicesUpdated={fetchServices}
-          />
+          currentUser?.role === 'ADMIN' ? (
+            <AdminDashboard 
+              onBack={() => setActiveTab('home')} 
+              currentUser={currentUser}
+              isDemoMode={isDemoMode}
+              onLogout={handleLogout}
+              onChangePassword={() => setShowChangePasswordModal(true)}
+              onServicesUpdated={fetchServices}
+            />
+          ) : (
+            <div className="max-w-md mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-4 shadow-sm">
+              <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto text-2xl">
+                🔒
+              </div>
+              <h3 className="text-lg font-extrabold text-slate-900">Akses Terbatas Administrator</h3>
+              <p className="text-xs text-slate-500">
+                Fitur ini khusus untuk manajemen internal AzGo. Silakan masuk dengan akun Administrator resmi.
+              </p>
+              <button
+                onClick={() => {
+                  setLoginTargetMessage('Silakan masuk dengan akun Administrator AzGo');
+                  setShowLoginModal(true);
+                }}
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Masuk Sebagai Administrator
+              </button>
+            </div>
+          )
         )}
       </main>
 
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
         <p className="font-semibold text-slate-700">AZ GO SuperApp — Solusi Dari A Sampai Z</p>
         <p className="mt-1 text-slate-400">
-          Pelanggan • Mitra Driver • Mitra Toko Resto & Mart • Staff Drop Point/Hub • Admin Control Tower
+          Pelanggan • Mitra Driver • Mitra Toko Resto & Mart
         </p>
+        <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
+          {currentUser?.role === 'ADMIN' ? (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className="text-slate-600 hover:text-slate-900 font-bold underline cursor-pointer"
+            >
+              Buka Dashboard Administrator ↗
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setLoginTargetMessage('Silakan masuk dengan akun Administrator AzGo');
+                setShowLoginModal(true);
+              }}
+              className="text-slate-300 hover:text-slate-500 transition cursor-pointer"
+            >
+              Portal Internal
+            </button>
+          )}
+        </div>
       </footer>
 
       {/* Floating Active Order Tracker Badge for Customers (Hanya tampil untuk yang berhak melacak) */}
