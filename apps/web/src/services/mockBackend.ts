@@ -365,3 +365,60 @@ export const MOCK_PARTNER_APPLICATIONS: any[] = [
     createdAt: new Date(Date.now() - 120 * 60000).toISOString()
   }
 ];
+
+export const MOCK_POS_SUBSCRIPTIONS: any[] = [
+  {
+    id: 'pos-sub-101',
+    merchantId: 'usr-mch-1',
+    merchantName: 'Pemilik Ayam Geprek Sambal Bawang',
+    storeName: 'Ayam Geprek Sambal Bawang Juara',
+    storeType: 'FOOD',
+    phone: '081299881122',
+    email: 'resto@azgo.com',
+    packageType: 'TRIAL_3_DAYS',
+    status: 'TRIAL',
+    price: 0,
+    paymentMethod: 'FREE_TRIAL',
+    startDate: new Date(Date.now() - 1 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 2 * 86400000).toISOString(),
+    requestedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+    reviewedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+    reviewedBy: 'Admin AZ GO',
+    adminNotes: 'Aktivasi otomatis Masa Percobaan 3 Hari'
+  },
+  {
+    id: 'pos-sub-102',
+    merchantId: 'usr-mch-2',
+    merchantName: 'Pengelola Az Mart Express',
+    storeName: 'Az Mart Express - Pusat',
+    storeType: 'MART',
+    phone: '081377889900',
+    email: 'mart@azgo.com',
+    packageType: 'MONTHLY',
+    status: 'PENDING_APPROVAL',
+    price: 79000,
+    paymentMethod: 'TRANSFER_BANK',
+    paymentProofUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=500&auto=format&fit=crop&q=60',
+    paymentProofName: 'bukti_transfer_bca_pos_mart.jpg',
+    requestedAt: new Date(Date.now() - 45 * 60000).toISOString(),
+    adminNotes: 'Menunggu verifikasi bukti transfer paket bundling bulanan'
+  },
+  {
+    id: 'pos-sub-103',
+    merchantId: 'usr-mch-3',
+    merchantName: 'Ibu Ratna Sari',
+    storeName: 'Dapur Manis & Bakery Ratna',
+    storeType: 'FOOD',
+    phone: '081255443322',
+    email: 'dapurmanis@gmail.com',
+    packageType: 'ANNUAL',
+    status: 'PENDING_APPROVAL',
+    price: 790000,
+    paymentMethod: 'QRIS',
+    paymentProofUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=500&auto=format&fit=crop&q=60',
+    paymentProofName: 'struk_qris_tahunan.jpg',
+    requestedAt: new Date(Date.now() - 90 * 60000).toISOString(),
+    adminNotes: 'Permohonan paket bundling tahunan (Hemat 2 Bulan)'
+  }
+];
+

@@ -11,7 +11,8 @@ import {
   MOCK_FINANCE_SUMMARY, 
   MOCK_COMMISSION_CONFIG, 
   MOCK_WITHDRAWALS, 
-  MOCK_PARTNER_APPLICATIONS 
+  MOCK_PARTNER_APPLICATIONS,
+  MOCK_POS_SUBSCRIPTIONS 
 } from './mockBackend';
 import { getSupabase } from './supabaseClient';
 
@@ -1275,5 +1276,132 @@ export const api = {
         data: { id, status: action }
       };
     });
+  },
+
+  // 12. POS & PAKET BUNDLING SUBSCRIPTIONS
+  async getPosSubscriptions(status?: string): Promise<any> {
+    return safeFetch('/admin/pos-subscriptions', undefined, () => {
+      let subs = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_pos_subs') || 'null') || MOCK_POS_SUBSCRIPTIONS)
+        : getRealStorage<any[]>('azgo_real_pos_subs', []);
+      if (status && status !== 'ALL') subs = subs.filter((s: any) => s.status === status);
+      return { success: true, data: subs };
+    });
+  },
+
+  async requestPosSubscription(data: {
+    merchantId: string;
+    merchantName: string;
+    storeType: 'FOOD' | 'MART';
+    phone: string;
+    email: string;
+    packageType: 'TRIAL_3_DAYS' | 'MONTHLY' | 'ANNUAL';
+    paymentMethod: 'TRANSFER_BANK' | 'QRIS' | 'FREE_TRIAL';
+    paymentProofUrl?: string;
+    paymentProofName?: string;
+  }): Promise<any> {
+    return safeFetch('/merchant/pos-subscription/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }, () => {
+      const isTrial = data.packageType === 'TRIAL_3_DAYS';
+      const price = isTrial ? 0 : data.packageType === 'MONTHLY' ? 79000 : 790000;
+      
+      const newSub = {
+        id: `pos-sub-${Date.now()}`,
+        merchantId: data.merchantId,
+        merchantName: data.merchantName,
+        storeType: data.storeType,
+        phone: data.phone,
+        email: data.email,
+        packageType: data.packageType,
+        status: isTrial ? 'TRIAL' : 'PENDING_APPROVAL',
+        price,
+        paymentMethod: data.paymentMethod,
+        paymentProofUrl: data.paymentProofUrl,
+        paymentProofName: data.paymentProofName,
+        startDate: isTrial ? new Date().toISOString() : undefined,
+        endDate: isTrial ? new Date(Date.now() + 3 * 86400000).toISOString() : undefined,
+        requestedAt: new Date().toISOString(),
+        reviewedAt: isTrial ? new Date().toISOString() : undefined,
+        reviewedBy: isTrial ? 'Sistem Otomatis (Instant 3-Day Trial)' : undefined,
+        adminNotes: isTrial ? 'Uji Coba 3 Hari Aktif Otomatis' : 'Menunggu verifikasi pembayaran oleh Owner/Admin'
+      };
+
+      if (isCurrentDemoMode()) {
+        const current = JSON.parse(localStorage.getItem('azgo_demo_pos_subs') || 'null') || [...MOCK_POS_SUBSCRIPTIONS];
+        const updated = [newSub, ...current.filter((s: any) => s.merchantId !== data.merchantId)];
+        localStorage.setItem('azgo_demo_pos_subs', JSON.stringify(updated));
+      } else {
+        const current = getRealStorage<any[]>('azgo_real_pos_subs', []);
+        const updated = [newSub, ...current.filter((s: any) => s.merchantId !== data.merchantId)];
+        setRealStorage('azgo_real_pos_subs', updated);
+      }
+
+      return {
+        success: true,
+        message: isTrial 
+          ? 'Masa Percobaan 3 Hari berhasil diaktifkan! Fitur kasir POS kini dapat digunakan.' 
+          : 'Permohonan langganan berhasil dikirim! Menunggu persetujuan Owner/Admin.',
+        data: newSub
+      };
+    });
+  },
+
+  async reviewPosSubscription(id: string, action: 'APPROVE' | 'REJECT', notes?: string, customDurationDays?: number): Promise<any> {
+    return safeFetch(`/admin/pos-subscriptions/${id}/review`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, notes, customDurationDays })
+    }, () => {
+      let subs = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_pos_subs') || 'null') || [...MOCK_POS_SUBSCRIPTIONS])
+        : getRealStorage<any[]>('azgo_real_pos_subs', []);
+
+      const target = subs.find((s: any) => s.id === id);
+      if (target) {
+        if (action === 'APPROVE') {
+          const durationDays = customDurationDays || (target.packageType === 'ANNUAL' ? 365 : target.packageType === 'MONTHLY' ? 30 : 3);
+          target.status = target.packageType === 'TRIAL_3_DAYS' ? 'TRIAL' : 'ACTIVE';
+          target.startDate = new Date().toISOString();
+          target.endDate = new Date(Date.now() + durationDays * 86400000).toISOString();
+          target.reviewedAt = new Date().toISOString();
+          target.reviewedBy = 'Super Admin AZ GO';
+          target.adminNotes = notes || `Disetujui untuk masa aktif ${durationDays} hari`;
+        } else {
+          target.status = 'REJECTED';
+          target.reviewedAt = new Date().toISOString();
+          target.reviewedBy = 'Super Admin AZ GO';
+          target.adminNotes = notes || 'Permohonan ditolak oleh Admin';
+        }
+
+        if (isCurrentDemoMode()) {
+          localStorage.setItem('azgo_demo_pos_subs', JSON.stringify(subs));
+        } else {
+          setRealStorage('azgo_real_pos_subs', subs);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Paket bundling POS berhasil di-${action === 'APPROVE' ? 'setujui & diaktifkan' : 'tolak'}`,
+        data: target
+      };
+    });
+  },
+
+  async getMerchantPosSubscription(merchantId: string): Promise<any> {
+    return safeFetch(`/merchant/pos-subscription/${merchantId}`, undefined, () => {
+      let subs = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_pos_subs') || 'null') || MOCK_POS_SUBSCRIPTIONS)
+        : getRealStorage<any[]>('azgo_real_pos_subs', []);
+      const found = subs.find((s: any) => s.merchantId === merchantId);
+      return {
+        success: true,
+        data: found || null
+      };
+    });
   }
 };
+

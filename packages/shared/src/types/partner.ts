@@ -54,3 +54,25 @@ export interface PartnerApplication {
   generatedUserId?: string;
   tempPassword?: string;
 }
+
+export interface PosSubscriptionApplication {
+  id: string;
+  merchantId: string;
+  merchantName: string;
+  storeType: MerchantCategoryType;
+  phone: string;
+  email: string;
+  packageType: import('./user').PosPackageType;
+  status: import('./user').PosSubscriptionStatus;
+  price: number;
+  paymentMethod: 'TRANSFER_BANK' | 'QRIS' | 'FREE_TRIAL';
+  paymentProofUrl?: string;
+  paymentProofName?: string;
+  startDate?: string;
+  endDate?: string;
+  requestedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  adminNotes?: string;
+}
+

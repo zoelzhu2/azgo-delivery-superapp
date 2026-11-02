@@ -8,7 +8,9 @@ import {
   PartnerApplicationStatus,
   CommissionConfig,
   WithdrawalRequest,
-  PlatformFinanceSummary
+  PlatformFinanceSummary,
+  PosSubscriptionApplication,
+  PosSubscriptionStatus
 } from '@delivery/shared';
 import { 
   Sliders, 
@@ -36,7 +38,13 @@ import {
   Ban,
   QrCode,
   Upload,
-  Trash2
+  Trash2,
+  Receipt,
+  Calendar,
+  Sparkles,
+  Clock,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -56,7 +64,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onServicesUpdated,
   isDemoMode = false
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'pricing' | 'drivers' | 'merchants' | 'hubs' | 'users' | 'partners' | 'finance' | 'services' | 'qris'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'pricing' | 'drivers' | 'merchants' | 'hubs' | 'users' | 'partners' | 'finance' | 'services' | 'qris' | 'pos-subscriptions'>('orders');
   const [metrics, setMetrics] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [serviceFilter, setServiceFilter] = useState('ALL');
@@ -66,6 +74,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [hubs, setHubs] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [saveSuccess, setSaveSuccess] = useState('');
+
+  // POS Bundling Subscriptions State
+  const [posSubscriptions, setPosSubscriptions] = useState<PosSubscriptionApplication[]>([]);
+  const [posStatusFilter, setPosStatusFilter] = useState<'ALL' | PosSubscriptionStatus | 'PENDING_APPROVAL'>('ALL');
+  const [posStoreFilter, setPosStoreFilter] = useState<'ALL' | 'FOOD' | 'MART'>('ALL');
+  const [selectedPosSub, setSelectedPosSub] = useState<PosSubscriptionApplication | null>(null);
+  const [showPosApprovalModal, setShowPosApprovalModal] = useState(false);
+  const [posActionType, setPosActionType] = useState<'APPROVE' | 'REJECT'>('APPROVE');
+  const [posDurationDays, setPosDurationDays] = useState(30);
+  const [posAdminNotes, setPosAdminNotes] = useState('');
+  const [posProofPreviewModal, setPosProofPreviewModal] = useState<string | null>(null);
+  const [posActionSuccess, setPosActionSuccess] = useState('');
 
   // QRIS Payment Settings State
   const [qrisMerchantName, setQrisMerchantName] = useState('AZ GO INDONESIA');
@@ -143,7 +163,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Fetch Initial Data
   const loadData = async () => {
     try {
-      const [mRes, oRes, pRes, dRes, merchRes, hRes, uRes, partRes, finRes, commRes, wRes, srvRes] = await Promise.all([
+      const [mRes, oRes, pRes, dRes, merchRes, hRes, uRes, partRes, finRes, commRes, wRes, srvRes, posRes] = await Promise.all([
         api.getAdminMetrics(),
         api.getAdminOrders(serviceFilter),
         api.getAdminPricing(),
@@ -155,7 +175,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         api.getFinanceSummary(),
         api.getCommissionConfig(),
         api.getWithdrawalRequests(),
-        api.getAdminServices()
+        api.getAdminServices(),
+        api.getPosSubscriptions()
       ]);
       if (mRes.success) setMetrics(mRes.data);
       if (oRes.success) setOrders(oRes.data);
@@ -169,6 +190,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (commRes.success) setCommissionConfig(commRes.data);
       if (wRes.success) setWithdrawalRequests(wRes.data);
       if (srvRes?.success) setServices(srvRes.data);
+      if (posRes?.success && posRes.data) setPosSubscriptions(posRes.data);
     } catch (err) {
       console.error(err);
     }
@@ -384,6 +406,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (finRes.success) setFinanceSummary(finRes.data);
       } else {
         alert(res.message || 'Gagal memproses penarikan');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Terjadi kesalahan sistem');
+    }
+  };
+
+  // Review & Approval Handler for POS Bundling Subscription
+  const handleOpenPosModal = (sub: PosSubscriptionApplication, action: 'APPROVE' | 'REJECT') => {
+    setSelectedPosSub(sub);
+    setPosActionType(action);
+    const defaultDays = sub.packageType === 'ANNUAL' ? 365 : sub.packageType === 'MONTHLY' ? 30 : 3;
+    setPosDurationDays(defaultDays);
+    setPosAdminNotes(action === 'APPROVE' 
+      ? `Disetujui untuk masa aktif ${defaultDays} hari` 
+      : 'Bukti pembayaran tidak sesuai atau belum masuk mutasi');
+    setShowPosApprovalModal(true);
+  };
+
+  const handleReviewPosSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPosSub) return;
+    try {
+      const res = await api.reviewPosSubscription(
+        selectedPosSub.id,
+        posActionType,
+        posAdminNotes,
+        posDurationDays
+      );
+      if (res.success && res.data) {
+        setPosSubscriptions(prev => prev.map(s => s.id === selectedPosSub.id ? res.data : s));
+        setShowPosApprovalModal(false);
+        setSelectedPosSub(null);
+        setPosActionSuccess(`Paket POS untuk "${res.data.merchantName}" berhasil di-${posActionType === 'APPROVE' ? 'setujui & diaktifkan' : 'tolak'}!`);
+        setTimeout(() => setPosActionSuccess(''), 5000);
+      } else {
+        alert(res.message || 'Gagal memproses permohonan POS');
       }
     } catch (err: any) {
       alert(err.message || 'Terjadi kesalahan sistem');
@@ -732,6 +790,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <QrCode className="w-4 h-4 text-rose-400" /> Barcode QRIS & Pembayaran
+        </button>
+
+        <button
+          onClick={() => setActiveTab('pos-subscriptions')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            activeTab === 'pos-subscriptions' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Receipt className="w-4 h-4 text-emerald-400" /> Paket Bundling POS ({posSubscriptions.filter(s => s.status === 'ACTIVE' || s.status === 'TRIAL').length})
+          {posSubscriptions.filter(s => s.status === 'PENDING_APPROVAL').length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+              {posSubscriptions.filter(s => s.status === 'PENDING_APPROVAL').length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -2039,6 +2111,326 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* ================= TAB 11: PAKET BUNDLING POS (OWNER / ADMIN APPROVAL) ================= */}
+      {activeTab === 'pos-subscriptions' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-emerald-900 via-slate-900 to-slate-950 text-white rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xl border border-emerald-800/40">
+            <div className="relative z-10 max-w-2xl space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Persetujuan & Manajemen Paket Bundling POS</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                Kontrol Langganan Kasir Offline & Laporan Keuangan Mitra
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Kelola aktivasi fitur POS kasir meja/takeaway dan rekapitulasi keuangan terpadu untuk mitra Resto & Mart.
+                Tinjau bukti transfer pembayaran paket Bulanan (Rp 79rb) atau Tahunan (Rp 790rb), serta pantau mitra yang mencoba Masa Uji Coba 3 Hari.
+              </p>
+            </div>
+            <div className="absolute right-0 bottom-0 translate-x-8 translate-y-8 opacity-10 pointer-events-none">
+              <Receipt className="w-72 h-72 text-emerald-300" />
+            </div>
+          </div>
+
+          {posActionSuccess && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs rounded-2xl font-bold flex items-center gap-2.5 animate-in fade-in duration-200 shadow-sm">
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{posActionSuccess}</span>
+            </div>
+          )}
+
+          {/* KPI Statistics */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm">
+              <span className="text-xs font-bold text-slate-400 block mb-1">Total Mitra Berlangganan</span>
+              <p className="text-2xl font-black text-slate-900">
+                {posSubscriptions.filter(s => s.status === 'ACTIVE' || s.status === 'TRIAL').length} Toko
+              </p>
+              <span className="text-[11px] text-emerald-600 font-bold mt-1 block">
+                {posSubscriptions.filter(s => s.status === 'ACTIVE').length} Berbayar • {posSubscriptions.filter(s => s.status === 'TRIAL').length} Trial
+              </span>
+            </div>
+
+            <div className={`p-5 rounded-3xl border shadow-sm ${
+              posSubscriptions.filter(s => s.status === 'PENDING_APPROVAL').length > 0
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : 'bg-white border-slate-200 text-slate-900'
+            }`}>
+              <span className="text-xs font-bold text-slate-400 block mb-1">Menunggu Persetujuan</span>
+              <p className="text-2xl font-black text-rose-600">
+                {posSubscriptions.filter(s => s.status === 'PENDING_APPROVAL').length} Pengajuan
+              </p>
+              <span className="text-[11px] font-bold text-rose-700 mt-1 block">
+                {posSubscriptions.filter(s => s.status === 'PENDING_APPROVAL').length > 0 ? 'Perlu tindakan aktivasi segera' : 'Semua pengajuan telah ditinjau'}
+              </span>
+            </div>
+
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm">
+              <span className="text-xs font-bold text-slate-400 block mb-1">Masa Uji Coba (3 Hari)</span>
+              <p className="text-2xl font-black text-blue-600">
+                {posSubscriptions.filter(s => s.status === 'TRIAL').length} Mitra
+              </p>
+              <span className="text-[11px] text-blue-700 font-medium mt-1 block">
+                Peluang konversi ke paket berbayar
+              </span>
+            </div>
+
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm">
+              <span className="text-xs font-bold text-slate-400 block mb-1">Pendapatan Langganan POS</span>
+              <p className="text-2xl font-black text-emerald-700">
+                Rp {posSubscriptions.filter(s => s.status === 'ACTIVE').reduce((sum, s) => sum + (s.price || 0), 0).toLocaleString('id-ID')}
+              </p>
+              <span className="text-[11px] text-slate-500 font-medium mt-1 block">
+                Total akumulasi paket aktif
+              </span>
+            </div>
+          </div>
+
+          {/* Filter Bar & Applications List */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-emerald-600" />
+                  Daftar Pengajuan & Status Langganan POS Mitra
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Total {posSubscriptions.length} mitra terdaftar dalam sistem bundling POS kasir
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={posStatusFilter}
+                  onChange={e => setPosStatusFilter(e.target.value as any)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="PENDING_APPROVAL">Menunggu Persetujuan</option>
+                  <option value="ACTIVE">Aktif (Berbayar)</option>
+                  <option value="TRIAL">Masa Uji Coba (3 Hari)</option>
+                  <option value="EXPIRED">Kedaluwarsa</option>
+                  <option value="REJECTED">Ditolak</option>
+                </select>
+
+                <select
+                  value={posStoreFilter}
+                  onChange={e => setPosStoreFilter(e.target.value as any)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50"
+                >
+                  <option value="ALL">Semua Jenis Toko</option>
+                  <option value="FOOD">Resto / Makanan</option>
+                  <option value="MART">Mart / Swalayan</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table of Subscriptions */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-400 uppercase font-black text-[10px] tracking-wider border-y border-slate-100">
+                  <tr>
+                    <th className="py-3 px-3">Mitra & Toko</th>
+                    <th className="py-3 px-3">Paket Bundling</th>
+                    <th className="py-3 px-3">Harga & Pembayaran</th>
+                    <th className="py-3 px-3">Bukti Transfer</th>
+                    <th className="py-3 px-3">Masa Berlaku</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3 text-right">Aksi Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {posSubscriptions
+                    .filter(s => {
+                      const matchStatus = posStatusFilter === 'ALL' || s.status === posStatusFilter;
+                      const matchStore = posStoreFilter === 'ALL' || s.storeType === posStoreFilter;
+                      return matchStatus && matchStore;
+                    })
+                    .map(sub => {
+                      const isExpired = sub.endDate && new Date(sub.endDate).getTime() < Date.now();
+                      const daysLeft = sub.endDate 
+                        ? Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                        : null;
+
+                      return (
+                        <tr key={sub.id} className="hover:bg-slate-50/80 transition">
+                          <td className="py-3.5 px-3">
+                            <div className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                              {sub.merchantName}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-slate-400 text-[11px]">
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                sub.storeType === 'FOOD' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                              }`}>
+                                {sub.storeType === 'FOOD' ? 'Resto / Makanan' : 'Mart / Toko'}
+                              </span>
+                              <span>{sub.phone || '-'}</span>
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-3">
+                            {sub.packageType === 'TRIAL_3_DAYS' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-blue-600" /> Trial 3 Hari (Gratis)
+                              </span>
+                            )}
+                            {sub.packageType === 'MONTHLY' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-emerald-600" /> Paket Bulanan
+                              </span>
+                            )}
+                            {sub.packageType === 'ANNUAL' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-600" /> Paket Tahunan (Hemat)
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-3">
+                            <span className="font-black text-slate-900 block text-xs">
+                              {sub.price === 0 ? 'GRATIS (Rp 0)' : `Rp ${sub.price.toLocaleString('id-ID')}`}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {sub.paymentMethod || 'Uji Coba Sistem'}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-3">
+                            {sub.paymentProofUrl ? (
+                              <button
+                                onClick={() => setPosProofPreviewModal(sub.paymentProofUrl || null)}
+                                className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 border border-slate-200 transition"
+                              >
+                                <Eye className="w-3 h-3 text-slate-500" />
+                                <span>Lihat Bukti Transfer</span>
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 text-[11px] italic">
+                                {sub.packageType === 'TRIAL_3_DAYS' ? 'Tanpa Bukti (Uji Coba)' : 'Belum diunggah'}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-3">
+                            {sub.startDate && sub.endDate ? (
+                              <div>
+                                <span className="font-mono text-[11px] text-slate-700 block">
+                                  {new Date(sub.startDate).toLocaleDateString('id-ID')} s/d {new Date(sub.endDate).toLocaleDateString('id-ID')}
+                                </span>
+                                <span className={`text-[10px] font-bold ${
+                                  isExpired ? 'text-rose-600' : daysLeft !== null && daysLeft <= 3 ? 'text-amber-600' : 'text-emerald-600'
+                                }`}>
+                                  {isExpired ? '⚠️ Telah Kedaluwarsa' : `Sisa ${daysLeft} hari lagi`}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">Belum aktif</span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-3">
+                            {sub.status === 'PENDING_APPROVAL' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200 animate-pulse inline-flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 text-rose-600" /> Menunggu Persetujuan
+                              </span>
+                            )}
+                            {sub.status === 'ACTIVE' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3 text-emerald-600" /> Aktif Berlangganan
+                              </span>
+                            )}
+                            {sub.status === 'TRIAL' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-blue-600" /> Uji Coba 3 Hari
+                              </span>
+                            )}
+                            {sub.status === 'EXPIRED' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                                Kedaluwarsa
+                              </span>
+                            )}
+                            {sub.status === 'REJECTED' && (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700">
+                                Ditolak
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              {sub.status === 'PENDING_APPROVAL' && (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenPosModal(sub, 'APPROVE')}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition inline-flex items-center gap-1"
+                                    title="Setujui dan aktifkan paket POS untuk mitra ini"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Setujui & Aktifkan</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleOpenPosModal(sub, 'REJECT')}
+                                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition"
+                                    title="Tolak permohonan langganan"
+                                  >
+                                    Tolak
+                                  </button>
+                                </>
+                              )}
+
+                              {(sub.status === 'ACTIVE' || sub.status === 'TRIAL') && (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenPosModal(sub, 'APPROVE')}
+                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold border border-slate-200 transition inline-flex items-center gap-1"
+                                    title="Perpanjang durasi hari aktif paket"
+                                  >
+                                    <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span>Perpanjang / Edit</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleOpenPosModal(sub, 'REJECT')}
+                                    className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition"
+                                    title="Nonaktifkan akses POS kasir"
+                                  >
+                                    Nonaktifkan
+                                  </button>
+                                </>
+                              )}
+
+                              {(sub.status === 'EXPIRED' || sub.status === 'REJECTED') && (
+                                <button
+                                  onClick={() => handleOpenPosModal(sub, 'APPROVE')}
+                                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-200 transition inline-flex items-center gap-1"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Aktifkan Kembali</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+
+              {posSubscriptions.length === 0 && (
+                <div className="p-8 text-center space-y-2">
+                  <Receipt className="w-12 h-12 text-slate-300 mx-auto" />
+                  <p className="font-extrabold text-slate-800 text-sm">Belum Ada Pengajuan Paket Bundling POS</p>
+                  <p className="text-xs text-slate-400">
+                    Mitra Resto dan Mart dapat mengajukan langganan POS langsung dari portal mitra masing-masing.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL TAMBAH MITRA PENGEMUDI ================= */}
       {showDriverModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2931,6 +3323,200 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PERSETUJUAN & AKTIVASI PAKET POS ================= */}
+      {showPosApprovalModal && selectedPosSub && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-emerald-600" />
+                  {posActionType === 'APPROVE' ? 'Setujui & Aktifkan Paket POS' : 'Tolak Permohonan POS'}
+                </h3>
+                <p className="text-[11px] text-slate-400">ID Pengajuan: {selectedPosSub.id}</p>
+              </div>
+              <button 
+                onClick={() => setShowPosApprovalModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Nama Toko/Resto:</span>
+                <span className="font-extrabold text-slate-900">{selectedPosSub.merchantName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Jenis Usaha:</span>
+                <span className="font-bold text-slate-800">
+                  {selectedPosSub.storeType === 'FOOD' ? 'Restoran / Rumah Makan' : 'Toko / Mart Swalayan'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Paket yang Diminta:</span>
+                <span className="font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  {selectedPosSub.packageType === 'TRIAL_3_DAYS' && 'Trial 3 Hari (Gratis)'}
+                  {selectedPosSub.packageType === 'MONTHLY' && 'Paket Bulanan (Rp 79.000)'}
+                  {selectedPosSub.packageType === 'ANNUAL' && 'Paket Tahunan (Rp 790.000)'}
+                </span>
+              </div>
+              {selectedPosSub.paymentProofUrl && (
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                  <span className="text-slate-500">Bukti Pembayaran:</span>
+                  <button
+                    type="button"
+                    onClick={() => setPosProofPreviewModal(selectedPosSub.paymentProofUrl || null)}
+                    className="text-indigo-600 font-bold hover:underline flex items-center gap-1"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Buka Foto Bukti Transfer
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleReviewPosSubmit} className="space-y-3.5 text-xs">
+              {posActionType === 'APPROVE' ? (
+                <>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Durasi Hari Masa Aktif (Hari)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="1000"
+                        required
+                        value={posDurationDays}
+                        onChange={e => setPosDurationDays(parseInt(e.target.value) || 1)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold"
+                      />
+                      <span className="text-slate-500 font-bold shrink-0">Hari</span>
+                    </div>
+                    <div className="flex gap-2 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPosDurationDays(3)}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold"
+                      >
+                        3 Hari (Trial)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPosDurationDays(30)}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold"
+                      >
+                        30 Hari (1 Bulan)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPosDurationDays(365)}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold"
+                      >
+                        365 Hari (1 Tahun)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Catatan Admin / Owner (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Pembayaran transfer BCA telah divalidasi mutasi."
+                      value={posAdminNotes}
+                      onChange={e => setPosAdminNotes(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-[11px] text-emerald-900 flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <p>
+                      Begitu diaktifkan, menu <strong>POS Kasir & Laporan Keuangan</strong> pada portal mitra akan langsung terbuka otomatis.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Alasan Penolakan Permohonan
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      placeholder="Contoh: Bukti transfer buram atau dana belum masuk pada mutasi rekening AZ GO."
+                      value={posAdminNotes}
+                      onChange={e => setPosAdminNotes(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPosApprovalModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 py-2.5 text-white font-bold rounded-xl shadow-md transition ${
+                    posActionType === 'APPROVE'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  {posActionType === 'APPROVE' ? 'Konfirmasi & Aktifkan Paket' : 'Konfirmasi Tolak'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PREVIEW BUKTI TRANSFER PEMBAYARAN POS ================= */}
+      {posProofPreviewModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-3">
+            <div className="flex justify-between items-center">
+              <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                <Eye className="w-4 h-4 text-slate-600" />
+                Bukti Pembayaran / Transfer Mitra
+              </h4>
+              <button 
+                onClick={() => setPosProofPreviewModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-100 rounded-2xl p-2 border border-slate-200 flex items-center justify-center min-h-[260px] max-h-[420px] overflow-hidden">
+              <img
+                src={posProofPreviewModal}
+                alt="Bukti Transfer POS"
+                className="max-h-[380px] w-auto object-contain rounded-xl shadow-sm"
+              />
+            </div>
+
+            <button
+              onClick={() => setPosProofPreviewModal(null)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs"
+            >
+              Tutup Preview
+            </button>
           </div>
         </div>
       )}

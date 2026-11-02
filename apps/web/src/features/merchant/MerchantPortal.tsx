@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, WalletTransaction } from '@delivery/shared';
+import { User, WalletTransaction, PosSubscriptionApplication, PosPackageType } from '@delivery/shared';
 import { api } from '../../services/apiClient';
 import { 
   Store, 
@@ -7,23 +7,37 @@ import {
   ArrowLeft, 
   Power, 
   ChefHat, 
-  Plus,
-  KeyRound,
-  LogOut,
-  Percent,
-  CreditCard,
-  AlertCircle,
-  X,
-  DollarSign,
-  AlertTriangle,
-  MessageSquare,
-  ShieldAlert,
-  Bike,
-  Radio,
-  Trash2,
-  UserPlus,
-  UserCheck,
-  Phone
+  Plus, 
+  KeyRound, 
+  LogOut, 
+  Percent, 
+  CreditCard, 
+  AlertCircle, 
+  X, 
+  DollarSign, 
+  AlertTriangle, 
+  MessageSquare, 
+  ShieldAlert, 
+  Bike, 
+  Radio, 
+  Trash2, 
+  UserPlus, 
+  UserCheck, 
+  Phone,
+  Receipt,
+  Calendar,
+  Sparkles,
+  Clock,
+  Printer,
+  Search,
+  ShoppingBag,
+  Check,
+  CheckCircle,
+  QrCode,
+  History,
+  BarChart3,
+  Send,
+  Upload
 } from 'lucide-react';
 
 interface MerchantPortalProps {
@@ -46,9 +60,78 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
   const registeredHolder = currentUser?.accountHolder || currentUser?.fullName || 'Bambang Sudiro';
   const storePhone = currentUser?.phone || '08123456789';
 
-  const [activeMerchantTab, setActiveMerchantTab] = useState<'orders' | 'menu' | 'couriers' | 'finance'>('orders');
+  const [activeMerchantTab, setActiveMerchantTab] = useState<'orders' | 'menu' | 'couriers' | 'finance' | 'pos'>('orders');
   const [isOpen, setIsOpen] = useState(isMerchantActive);
   const [selectedStoreType] = useState<'FOOD' | 'MART'>(accountStoreType);
+
+  // POS Bundling & Subscription States
+  const [posSub, setPosSub] = useState<PosSubscriptionApplication | null>(null);
+  const [selectedPosPkg, setSelectedPosPkg] = useState<PosPackageType>('TRIAL_3_DAYS');
+  const [posPaymentMethod, setPosPaymentMethod] = useState<'TRANSFER_BANK' | 'QRIS'>('TRANSFER_BANK');
+  const [posPaymentProofUrl, setPosPaymentProofUrl] = useState<string>('');
+  const [posPaymentProofName, setPosPaymentProofName] = useState<string>('');
+  const [posSubmitLoading, setPosSubmitLoading] = useState(false);
+  const [posNotice, setPosNotice] = useState('');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // POS Cashier Operations State
+  const [posSubView, setPosSubView] = useState<'CASHIER' | 'REPORTS'>('CASHIER');
+  const [posOrderType, setPosOrderType] = useState<'DINE_IN' | 'TAKEAWAY' | 'MART_DIRECT'>(
+    accountStoreType === 'FOOD' ? 'DINE_IN' : 'MART_DIRECT'
+  );
+  const [posTableNumber, setPosTableNumber] = useState('Meja 01');
+  const [posCustomerName, setPosCustomerName] = useState('Pelanggan Kasir');
+  const [posSearchQuery, setPosSearchQuery] = useState('');
+  const [posCart, setPosCart] = useState<Array<{ id: string; name: string; price: number; qty: number; notes?: string }>>([]);
+  const [posDiscount, setPosDiscount] = useState<number>(0);
+  const [posTaxEnabled, setPosTaxEnabled] = useState<boolean>(false);
+  const [showPosPaymentModal, setShowPosPaymentModal] = useState(false);
+  const [posPayMethod, setPosPayMethod] = useState<'CASH' | 'QRIS' | 'DEBIT'>('CASH');
+  const [posCashTendered, setPosCashTendered] = useState<number>(0);
+  const [posDebitRef, setPosDebitRef] = useState<string>('');
+  const [completedPosSale, setCompletedPosSale] = useState<any | null>(null);
+  const [buyerWaPhone, setBuyerWaPhone] = useState('');
+  const [posSalesHistory, setPosSalesHistory] = useState<any[]>([
+    {
+      id: 'pos-101',
+      receiptNumber: 'POS-20261102-001',
+      time: '09:15',
+      orderType: 'DINE_IN',
+      tableNumber: 'Meja 02',
+      customerName: 'Maya A.',
+      items: [
+        { name: 'Paket Ayam Geprek Level 3 + Nasi', qty: 2, price: 25000 },
+        { name: 'Es Teh Manis Jumbo', qty: 2, price: 6000 }
+      ],
+      subtotal: 62000,
+      discount: 0,
+      tax: 0,
+      total: 62000,
+      payMethod: 'QRIS',
+      cashTendered: 62000,
+      cashChange: 0,
+      cashierName: currentUser?.fullName || 'Kasir Resto'
+    },
+    {
+      id: 'pos-102',
+      receiptNumber: 'POS-20261102-002',
+      time: '09:40',
+      orderType: 'TAKEAWAY',
+      tableNumber: '-',
+      customerName: 'Bapak Rian',
+      items: [
+        { name: 'Paket Ayam Geprek Level 1 + Nasi', qty: 1, price: 25000 }
+      ],
+      subtotal: 25000,
+      discount: 5000,
+      tax: 0,
+      total: 20000,
+      payMethod: 'CASH',
+      cashTendered: 50000,
+      cashChange: 30000,
+      cashierName: currentUser?.fullName || 'Kasir Resto'
+    }
+  ]);
 
   // Store Couriers (Kurir Mandiri Toko)
   const [storeCouriers, setStoreCouriers] = useState<Array<{
@@ -143,7 +226,20 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
         console.error('Failed to load merchant wallet', err);
       }
     };
+
+    const fetchPos = async () => {
+      try {
+        const partnerId = currentUser?.id || 'mch-1';
+        const pRes = await api.getMerchantPosSubscription(partnerId);
+        if (pRes?.success && pRes.data) {
+          setPosSub(pRes.data);
+        }
+      } catch (err) {
+        console.error('Failed to load merchant POS subscription', err);
+      }
+    };
     fetchWallet();
+    fetchPos();
   }, [currentUser?.id]);
 
   // Order Inbox Resto / Mart
@@ -430,6 +526,167 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
     setNewItemName('');
   };
 
+  // POS Bundling Subscription Handlers
+  const handleUploadPosProof = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran file bukti pembayaran maksimal 5 MB.');
+      return;
+    }
+    setPosPaymentProofName(file.name);
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      setPosPaymentProofUrl(uploadEvent.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRequestPosSubscription = async (pkgType: PosPackageType) => {
+    const partnerId = currentUser?.id || 'mch-1';
+    const isTrial = pkgType === 'TRIAL_3_DAYS';
+
+    if (!isTrial && !posPaymentProofUrl) {
+      alert('Mohon unggah foto / tangkapan layar bukti transfer pembayaran terlebih dahulu.');
+      return;
+    }
+
+    setPosSubmitLoading(true);
+    try {
+      const res = await api.requestPosSubscription({
+        merchantId: partnerId,
+        merchantName: selectedStoreType === 'FOOD' ? 'Ayam Geprek Sambal Bawang Juara' : 'Az Mart Express - Sudirman',
+        storeType: selectedStoreType,
+        phone: storePhone,
+        email: currentUser?.email || 'mitra@resto.id',
+        packageType: pkgType,
+        paymentMethod: isTrial ? 'FREE_TRIAL' : posPaymentMethod,
+        paymentProofUrl: isTrial ? undefined : posPaymentProofUrl,
+        paymentProofName: isTrial ? undefined : posPaymentProofName
+      });
+
+      if (res.success && res.data) {
+        setPosSub(res.data);
+        setShowUpgradeModal(false);
+        setPosNotice(res.message || 'Permohonan berhasil dikirim!');
+        setTimeout(() => setPosNotice(''), 7000);
+      } else {
+        alert(res.message || 'Gagal mengirim permohonan paket bundling');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Terjadi kesalahan sistem saat mendaftar paket');
+    } finally {
+      setPosSubmitLoading(false);
+    }
+  };
+
+  // POS Cashier Cart & Order Handlers
+  const handleAddToCart = (item: any) => {
+    setPosCart(prev => {
+      const existing = prev.find(i => i.id === item.id);
+      if (existing) {
+        return prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+      }
+      return [...prev, { id: item.id, name: item.name, price: item.price, qty: 1 }];
+    });
+  };
+
+  const handleUpdateCartQty = (itemId: string, delta: number) => {
+    setPosCart(prev => {
+      return prev
+        .map(i => i.id === itemId ? { ...i, qty: i.qty + delta } : i)
+        .filter(i => i.qty > 0);
+    });
+  };
+
+  const handleClearCart = () => {
+    setPosCart([]);
+    setPosDiscount(0);
+    setPosTaxEnabled(false);
+  };
+
+  const cartSubtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  const cartTax = posTaxEnabled ? Math.round(cartSubtotal * 0.1) : 0;
+  const cartTotal = Math.max(0, cartSubtotal + cartTax - posDiscount);
+  const cashChange = posPayMethod === 'CASH' ? Math.max(0, posCashTendered - cartTotal) : 0;
+
+  const handleOpenCheckout = () => {
+    if (posCart.length === 0) {
+      alert('Keranjang kasir masih kosong. Silakan pilih menu/produk terlebih dahulu.');
+      return;
+    }
+    setPosPayMethod('CASH');
+    setPosCashTendered(cartTotal);
+    setPosDebitRef('');
+    setShowPosPaymentModal(true);
+  };
+
+  const handleConfirmPosPayment = () => {
+    if (posPayMethod === 'CASH' && posCashTendered < cartTotal) {
+      alert(`Uang tunai yang diterima (Rp ${posCashTendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${cartTotal.toLocaleString('id-ID')}).`);
+      return;
+    }
+
+    const newSale = {
+      id: `pos-${Date.now()}`,
+      receiptNumber: `POS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
+      date: new Date().toLocaleDateString('id-ID'),
+      time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      orderType: posOrderType,
+      tableNumber: posOrderType === 'DINE_IN' ? posTableNumber : '-',
+      customerName: posCustomerName || 'Pelanggan Kasir',
+      items: [...posCart],
+      subtotal: cartSubtotal,
+      discount: posDiscount,
+      tax: cartTax,
+      total: cartTotal,
+      payMethod: posPayMethod,
+      cashTendered: posPayMethod === 'CASH' ? posCashTendered : cartTotal,
+      cashChange,
+      cashierName: currentUser?.fullName || 'Kasir Toko'
+    };
+
+    setPosSalesHistory(prev => [newSale, ...prev]);
+    setShowPosPaymentModal(false);
+    handleClearCart();
+    setCompletedPosSale(newSale);
+  };
+
+  const handleShareWhatsAppReceipt = (sale: any, phone: string) => {
+    if (!phone || phone.trim().length < 9) {
+      alert('Mohon masukkan nomor WhatsApp pelanggan yang valid (contoh: 08123456789).');
+      return;
+    }
+    let clean = phone.trim().replace(/\D/g, '');
+    if (clean.startsWith('0')) {
+      clean = '62' + clean.slice(1);
+    }
+
+    const storeName = selectedStoreType === 'FOOD' ? 'Ayam Geprek Sambal Bawang Juara' : 'Az Mart Express - Sudirman';
+    const itemsText = sale.items.map((it: any) => `• ${it.qty}x ${it.name} = Rp ${(it.qty * it.price).toLocaleString('id-ID')}`).join('\n');
+
+    const msg = `*STRUK DIGITAL AZ GO POS* 🧾
+*${storeName}*
+----------------------------------------
+No. Struk: ${sale.receiptNumber}
+Waktu: ${sale.date} ${sale.time} WIB
+Tipe: ${sale.orderType === 'DINE_IN' ? `Makan di Tempat (${sale.tableNumber})` : 'Bungkus / Belanja Kasir'}
+Kasir: ${sale.cashierName}
+----------------------------------------
+*Rincian Pembelian:*
+${itemsText}
+----------------------------------------
+Subtotal: Rp ${sale.subtotal.toLocaleString('id-ID')}
+${sale.discount > 0 ? `Diskon: -Rp ${sale.discount.toLocaleString('id-ID')}\n` : ''}${sale.tax > 0 ? `Pajak (10%): Rp ${sale.tax.toLocaleString('id-ID')}\n` : ''}*TOTAL BAYAR: Rp ${sale.total.toLocaleString('id-ID')}*
+Metode Bayar: ${sale.payMethod === 'CASH' ? `Tunai (Diterima: Rp ${sale.cashTendered.toLocaleString('id-ID')}, Kembali: Rp ${sale.cashChange.toLocaleString('id-ID')})` : sale.payMethod}
+----------------------------------------
+Terima kasih telah berbelanja di tempat kami! 🙏
+_Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
+
+    const url = `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (withdrawAmount <= 0) return;
@@ -668,6 +925,30 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
             Rp {walletBalance.toLocaleString('id-ID')}
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveMerchantTab('pos')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            activeMerchantTab === 'pos' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Receipt className="w-4 h-4 text-emerald-400" /> POS Kasir & Bundling
+          {posSub?.status === 'ACTIVE' && (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500 text-white">
+              PRO AKTIF
+            </span>
+          )}
+          {posSub?.status === 'TRIAL' && (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-500 text-white">
+              TRIAL 3 HARI
+            </span>
+          )}
+          {posSub?.status === 'PENDING_APPROVAL' && (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-white animate-pulse">
+              MENUNGGU ACC
+            </span>
+          )}
         </button>
       </div>
 
@@ -1077,6 +1358,895 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ================= TAB 5: POS KASIR & PAKET BUNDLING ================= */}
+      {activeMerchantTab === 'pos' && (
+        <div className="space-y-6">
+          {posNotice && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs rounded-2xl font-bold flex items-center gap-2.5 animate-in fade-in duration-200 shadow-sm">
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{posNotice}</span>
+            </div>
+          )}
+
+          {/* KONDISI 1: MITRA BELUM AKTIF BERLANGGANAN / SEDANG MENUNGGU APPROVAL */}
+          {(!posSub || posSub.status === 'NONE' || posSub.status === 'EXPIRED' || posSub.status === 'REJECTED' || posSub.status === 'PENDING_APPROVAL') ? (
+            <div className="space-y-6">
+              {/* Showcase Banner */}
+              <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xl border border-emerald-700/30">
+                <div className="relative z-10 max-w-2xl space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Paket Bundling POS & Laporan Keuangan Toko</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                    Kelola Penjualan Kasir Offline & Online Dalam Satu Layar
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    Tingkatkan efisiensi {selectedStoreType === 'FOOD' ? 'Restoran / Rumah Makan' : 'Toko / Mart'} Anda dengan sistem POS kasir meja, cetak struk thermal, hitung kembalian cepat, dan laporan keuangan terpadu yang menggabungkan penjualan kasir offline langsung dengan pesanan online AZ GO.
+                  </p>
+                </div>
+                <div className="absolute right-0 bottom-0 translate-x-6 translate-y-6 opacity-10 pointer-events-none">
+                  <Receipt className="w-64 h-64 text-emerald-400" />
+                </div>
+              </div>
+
+              {/* 4 Feature Highlights */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                    <Receipt className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-extrabold text-slate-900 text-xs">Kasir Meja & Bungkus</h4>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Catat pesanan Dine-In per nomor meja atau Takeaway dengan kalkulasi harga instan.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                    <Printer className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-extrabold text-slate-900 text-xs">Struk Bluetooth & WA</h4>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Cetak struk lewat printer thermal atau kirim struk digital langsung ke nomor WhatsApp pembeli.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                    <QrCode className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-extrabold text-slate-900 text-xs">QRIS & Uang Pas</h4>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Kalkulator hitung kembalian otomatis serta barcode QRIS kasir dinamis/statis.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-extrabold text-slate-900 text-xs">Laporan 1 Pintu</h4>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Rekapitulasi otomatis gabungan omset pesanan online delivery dan penjualan offline kasir.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Alert if Pending Approval */}
+              {posSub?.status === 'PENDING_APPROVAL' && (
+                <div className="p-5 bg-amber-50 border-2 border-amber-300 rounded-3xl text-amber-950 space-y-2 shadow-sm animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 font-black text-sm text-amber-900">
+                    <Clock className="w-5 h-5 text-amber-600 animate-spin" />
+                    <span>⏳ Permohonan Paket Bundling POS Sedang Diverifikasi Owner/Admin</span>
+                  </div>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    Anda telah mengajukan <strong>{posSub.packageType === 'MONTHLY' ? 'Paket Bulanan (Rp 79.000)' : 'Paket Tahunan (Rp 790.000)'}</strong> pada {new Date(posSub.requestedAt).toLocaleDateString('id-ID')}.
+                    Owner / Administrator AZ GO sedang memvalidasi mutasi bukti pembayaran Anda. Begitu disetujui, modul POS Kasir akan otomatis aktif dan dapat langsung digunakan.
+                  </p>
+                  <div className="text-[11px] text-amber-700 font-medium">
+                    Catatan: Jika butuh aktivasi segera, hubungi Admin melalui Call Center / WhatsApp resmi AZ GO.
+                  </div>
+                </div>
+              )}
+
+              {/* 3 Package Tier Cards */}
+              <div>
+                <div className="text-center max-w-md mx-auto mb-6 space-y-1">
+                  <h3 className="font-black text-slate-900 text-lg sm:text-xl">
+                    Pilih Paket Bundling Sesuai Kebutuhan Usaha Anda
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Tersedia masa percobaan 3 hari gratis tanpa biaya bagi mitra yang ingin mencoba terlebih dahulu!
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {/* TIER 1: TRIAL 3 HARI */}
+                  <div className={`p-6 rounded-3xl border-2 transition relative flex flex-col justify-between ${
+                    selectedPosPkg === 'TRIAL_3_DAYS' 
+                      ? 'border-blue-500 bg-blue-50/40 shadow-lg ring-2 ring-blue-400/20' 
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> Uji Coba Gratis
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-black text-slate-900 text-lg">Masa Percobaan 3 Hari</h4>
+                        <p className="text-xs text-slate-500">Coba semua fitur kasir & laporan tanpa risiko</p>
+                      </div>
+
+                      <div className="py-2 border-y border-slate-100">
+                        <span className="text-3xl font-black text-slate-900">GRATIS</span>
+                        <span className="text-xs text-slate-400 block mt-0.5">Masa aktif 3 hari penuh</span>
+                      </div>
+
+                      <ul className="space-y-2 text-xs text-slate-600">
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Akses penuh seluruh fitur kasir POS</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Cetak struk & kirim via WhatsApp</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Laporan gabungan offline & online</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Aktivasi otomatis kilat (Langsung aktif)</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={posSubmitLoading || posSub?.status === 'PENDING_APPROVAL'}
+                      onClick={() => handleRequestPosSubscription('TRIAL_3_DAYS')}
+                      className="mt-6 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>{posSubmitLoading ? 'Mengaktifkan...' : 'Mulai Coba Gratis 3 Hari'}</span>
+                    </button>
+                  </div>
+
+                  {/* TIER 2: BULANAN */}
+                  <div className={`p-6 rounded-3xl border-2 transition relative flex flex-col justify-between ${
+                    selectedPosPkg === 'MONTHLY' 
+                      ? 'border-emerald-600 bg-emerald-50/40 shadow-lg ring-2 ring-emerald-500/20' 
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" /> Fleksibel
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-black text-slate-900 text-lg">Paket Bulanan</h4>
+                        <p className="text-xs text-slate-500">Bayar per bulan sesuai pemakaian toko</p>
+                      </div>
+
+                      <div className="py-2 border-y border-slate-100">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-black text-slate-900">Rp 79.000</span>
+                          <span className="text-xs text-slate-400 font-semibold">/ bulan</span>
+                        </div>
+                        <span className="text-[11px] text-slate-400 block mt-0.5">Masa aktif 30 hari</span>
+                      </div>
+
+                      <ul className="space-y-2 text-xs text-slate-600">
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Transaksi kasir offline tanpa batas</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Dukungan printer Bluetooth & WhatsApp</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Rekapitulasi keuangan harian & bulanan</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Bantuan teknis & update sistem gratis</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPosPkg('MONTHLY')}
+                      className={`mt-6 w-full py-3 rounded-2xl text-xs font-bold transition shadow-sm ${
+                        selectedPosPkg === 'MONTHLY'
+                          ? 'bg-emerald-600 text-white shadow-md'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                      }`}
+                    >
+                      {selectedPosPkg === 'MONTHLY' ? '✓ Paket Terpilih' : 'Pilih Paket Bulanan'}
+                    </button>
+                  </div>
+
+                  {/* TIER 3: TAHUNAN (PALING HEMAT) */}
+                  <div className={`p-6 rounded-3xl border-2 transition relative flex flex-col justify-between ${
+                    selectedPosPkg === 'ANNUAL' 
+                      ? 'border-amber-500 bg-amber-50/40 shadow-xl ring-2 ring-amber-400/20' 
+                      : 'border-amber-300 bg-white hover:border-amber-400'
+                  }`}>
+                    <div className="absolute -top-3 right-6 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full shadow-md">
+                      🔥 Hemat 2 Bulan (Rp 158.000)
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Paling Hemat
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-black text-slate-900 text-lg">Paket Tahunan</h4>
+                        <p className="text-xs text-slate-500">Bayar 10 bulan gratis 2 bulan penuh</p>
+                      </div>
+
+                      <div className="py-2 border-y border-slate-100">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-black text-slate-900">Rp 790.000</span>
+                          <span className="text-xs text-slate-400 font-semibold">/ tahun</span>
+                        </div>
+                        <span className="text-[11px] text-emerald-600 font-bold block mt-0.5">
+                          Setara Rp 65.800 / bulan (Masa aktif 365 hari)
+                        </span>
+                      </div>
+
+                      <ul className="space-y-2 text-xs text-slate-600">
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Semua fitur lengkap paket bulanan</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Gratis biaya setup & aktivasi akun</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Prioritas bantuan teknis Owner / Admin</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Jaminan harga langganan terkunci 1 tahun</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPosPkg('ANNUAL')}
+                      className={`mt-6 w-full py-3 rounded-2xl text-xs font-bold transition shadow-sm ${
+                        selectedPosPkg === 'ANNUAL'
+                          ? 'bg-amber-600 text-white shadow-md'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                      }`}
+                    >
+                      {selectedPosPkg === 'ANNUAL' ? '✓ Paket Terpilih' : 'Pilih Paket Tahunan'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Pembayaran & Upload Bukti Transfer (Ketika Memilih Bulanan / Tahunan) */}
+              {(selectedPosPkg === 'MONTHLY' || selectedPosPkg === 'ANNUAL') && (
+                <div className="bg-white p-6 sm:p-7 rounded-3xl border-2 border-slate-200 shadow-md space-y-5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-base">
+                        Pembayaran & Konfirmasi Aktivasi: {selectedPosPkg === 'MONTHLY' ? 'Paket Bulanan (Rp 79.000)' : 'Paket Tahunan (Rp 790.000)'}
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Lakukan pembayaran sesuai nominal paket, lalu unggah bukti transfer untuk disetujui Owner / Admin.
+                      </p>
+                    </div>
+                    <span className="text-xl font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                      Rp {selectedPosPkg === 'MONTHLY' ? '79.000' : '790.000'}
+                    </span>
+                  </div>
+
+                  {/* Rekening Tujuan Pembayaran */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div 
+                      onClick={() => setPosPaymentMethod('TRANSFER_BANK')}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition space-y-2 ${
+                        posPaymentMethod === 'TRANSFER_BANK' ? 'bg-blue-50/70 border-blue-500 shadow-sm' : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <span className="font-bold text-slate-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <CreditCard className="w-4 h-4 text-blue-600" /> Transfer Rekening Bank (BCA)
+                        </span>
+                        {posPaymentMethod === 'TRANSFER_BANK' && (
+                          <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Dipilih</span>
+                        )}
+                      </span>
+                      <div className="space-y-1 font-mono text-[11px] text-slate-800">
+                        <div>Bank: <strong>BCA</strong></div>
+                        <div>No. Rekening: <strong>8830-192-831</strong></div>
+                        <div>Atas Nama: <strong>PT AZ GO SUPERAPP INDONESIA</strong></div>
+                      </div>
+                    </div>
+
+                    <div 
+                      onClick={() => setPosPaymentMethod('QRIS')}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition space-y-2 ${
+                        posPaymentMethod === 'QRIS' ? 'bg-rose-50/70 border-rose-500 shadow-sm' : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <span className="font-bold text-slate-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <QrCode className="w-4 h-4 text-rose-600" /> Scan QRIS Resmi AZ GO
+                        </span>
+                        {posPaymentMethod === 'QRIS' && (
+                          <span className="text-[10px] font-black text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full">Dipilih</span>
+                        )}
+                      </span>
+                      <p className="text-[11px] text-slate-500">
+                        Bisa di-scan dari aplikasi BCA, Mandiri, GoPay, OVO, ShopeePay, DANA, atau Livin'.
+                      </p>
+                      <div className="text-[11px] font-mono text-slate-700">
+                        NMID: <strong>ID1029384756209</strong> (AZ GO KASIR)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Upload Bukti Pembayaran */}
+                  <div className="space-y-2">
+                    <label className="block font-bold text-slate-700 text-xs">
+                      Unggah Bukti Transfer / Pembayaran (Foto / Screenshot m-Banking)
+                    </label>
+                    <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/20 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition text-center group">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleUploadPosProof}
+                        className="hidden"
+                      />
+                      <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-600 group-hover:scale-110 flex items-center justify-center transition mb-2 shadow-sm">
+                        <Upload className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <span className="font-bold text-slate-700 text-xs group-hover:text-emerald-700 transition">
+                        {posPaymentProofName ? `Berkas Terpilih: ${posPaymentProofName}` : 'Klik untuk Pilih Foto Bukti Transfer'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5">
+                        Format JPG, PNG, atau WEBP (Maksimal 5 MB)
+                      </span>
+                    </label>
+
+                    {posPaymentProofUrl && (
+                      <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-[11px]">
+                        <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Foto bukti berhasil dimuat dan siap dikirim ke Owner/Admin.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={posSubmitLoading || !posPaymentProofUrl}
+                    onClick={() => handleRequestPosSubscription(selectedPosPkg)}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>{posSubmitLoading ? 'Mengirim Bukti...' : 'Kirim Bukti Pembayaran untuk Persetujuan Admin'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* KONDISI 2: MITRA SUDAH MEMILIKI AKSES AKTIF (TRIAL ATAU BERLANGGANAN) */
+            <div className="space-y-5">
+              {/* POS Status Header */}
+              <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-inner">
+                    <Receipt className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-black text-slate-900 text-base">AZGO POS Kasir Pintar</h3>
+                      {posSub.status === 'TRIAL' ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-blue-600" />
+                          Masa Uji Coba 3 Hari Aktif
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-emerald-600" />
+                          Paket {posSub.packageType === 'ANNUAL' ? 'Tahunan' : 'Bulanan'} Aktif
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {posSub.endDate ? (
+                        <>Berlaku sampai: <strong>{new Date(posSub.endDate).toLocaleDateString('id-ID')}</strong> ({Math.max(0, Math.ceil((new Date(posSub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} hari lagi)</>
+                      ) : (
+                        'Masa aktif aktif tanpa batas'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Perpanjang / Upgrade Paket</span>
+                  </button>
+
+                  {/* Switch Sub-View POS */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                      onClick={() => setPosSubView('CASHIER')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                        posSubView === 'CASHIER' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <span>Kasir / Kasir Meja</span>
+                    </button>
+                    <button
+                      onClick={() => setPosSubView('REPORTS')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                        posSubView === 'REPORTS' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>Laporan Keuangan</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ================= SUB-VIEW 1: LAYAR KASIR TRANSAKSI ================= */}
+              {posSubView === 'CASHIER' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                  {/* Kolom Kiri / Tengah: Katalog Menu & Pilihan Meja */}
+                  <div className="lg:col-span-7 space-y-4">
+                    {/* Setup Tipe Order */}
+                    <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-xs font-bold text-slate-500">Tipe Pesanan Kasir:</span>
+                        <div className="flex gap-2">
+                          {selectedStoreType === 'FOOD' ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setPosOrderType('DINE_IN')}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                                  posOrderType === 'DINE_IN'
+                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                <span>🍽️ Makan di Tempat (Dine-In)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPosOrderType('TAKEAWAY')}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                                  posOrderType === 'TAKEAWAY'
+                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                <span>🛍️ Bungkus (Takeaway)</span>
+                              </button>
+                            </>
+                          ) : (
+                            <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-100 text-blue-800">
+                              🛒 Belanja Kasir Toko / Mart
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {posOrderType === 'DINE_IN' && selectedStoreType === 'FOOD' && (
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">Nomor Meja</label>
+                            <input
+                              type="text"
+                              placeholder="Contoh: Meja 04"
+                              value={posTableNumber}
+                              onChange={e => setPosTableNumber(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl border border-slate-300 font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">Nama Pembeli (Opsional)</label>
+                            <input
+                              type="text"
+                              placeholder="Nama tamu"
+                              value={posCustomerName}
+                              onChange={e => setPosCustomerName(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl border border-slate-300"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Search & Filter Bar */}
+                    <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Cari menu, makanan, produk, atau barcode..."
+                          value={posSearchQuery}
+                          onChange={e => setPosSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs focus:outline-slate-900"
+                        />
+                      </div>
+
+                      {/* Grid Item Katalog */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {menuItems
+                          .filter(it => it.name.toLowerCase().includes(posSearchQuery.toLowerCase()))
+                          .map(item => {
+                            const cartCount = posCart.find(c => c.id === item.id)?.qty || 0;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleAddToCart(item)}
+                                className={`p-3.5 rounded-2xl border text-left transition relative flex flex-col justify-between group ${
+                                  cartCount > 0 
+                                    ? 'border-emerald-500 bg-emerald-50/50 shadow-sm' 
+                                    : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-sm'
+                                }`}
+                              >
+                                {cartCount > 0 && (
+                                  <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center shadow-md animate-in zoom-in-50">
+                                    {cartCount}
+                                  </span>
+                                )}
+
+                                <div className="space-y-1">
+                                  <span className="text-xl block">
+                                    {selectedStoreType === 'FOOD' ? '🍛' : '📦'}
+                                  </span>
+                                  <h5 className="font-extrabold text-slate-900 text-xs line-clamp-2 leading-snug">
+                                    {item.name}
+                                  </h5>
+                                </div>
+
+                                <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between w-full">
+                                  <span className="font-black text-slate-900 text-xs">
+                                    Rp {item.price.toLocaleString('id-ID')}
+                                  </span>
+                                  <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center font-bold text-xs transition">
+                                    +
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      {menuItems.filter(it => it.name.toLowerCase().includes(posSearchQuery.toLowerCase())).length === 0 && (
+                        <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+                          <p>Menu / produk "{posSearchQuery}" tidak ditemukan.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleAddToCart({
+                                id: `item-custom-${Date.now()}`,
+                                name: posSearchQuery || 'Item Kasir Manual',
+                                price: 15000
+                              });
+                              setPosSearchQuery('');
+                            }}
+                            className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-200 hover:bg-emerald-100 transition"
+                          >
+                            + Tambahkan "{posSearchQuery || 'Item Manual'}" Langsung ke Kasir
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Kolom Kanan: Tiket Pesanan Kasir (Order Cart) */}
+                  <div className="lg:col-span-5 bg-white rounded-3xl border-2 border-slate-200 shadow-md p-5 space-y-4 sticky top-6">
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Tiket Kasir Aktif</span>
+                        <h4 className="font-black text-slate-900 text-sm">
+                          {posOrderType === 'DINE_IN' ? `Makan di Tempat (${posTableNumber || 'Meja 01'})` : 'Bungkus / Takeaway'}
+                        </h4>
+                      </div>
+                      <span className="text-xs font-mono text-slate-400">
+                        {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                      </span>
+                    </div>
+
+                    {/* List Item dalam Keranjang Kasir */}
+                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                      {posCart.map(item => (
+                        <div key={item.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex justify-between items-center text-xs">
+                          <div className="space-y-0.5 max-w-[55%]">
+                            <p className="font-bold text-slate-900 truncate">{item.name}</p>
+                            <span className="text-[11px] text-slate-500 font-mono">
+                              @Rp {item.price.toLocaleString('id-ID')}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1.5 bg-white rounded-xl border border-slate-200 p-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCartQty(item.id, -1)}
+                                className="w-5 h-5 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700"
+                              >
+                                -
+                              </button>
+                              <span className="w-5 text-center font-black text-slate-900">{item.qty}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCartQty(item.id, 1)}
+                                className="w-5 h-5 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <span className="font-black text-slate-900 text-xs min-w-[70px] text-right">
+                              Rp {(item.qty * item.price).toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {posCart.length === 0 && (
+                        <div className="p-8 text-center space-y-2 text-slate-400">
+                          <ShoppingBag className="w-8 h-8 mx-auto text-slate-300" />
+                          <p className="font-bold text-xs">Keranjang kasir masih kosong</p>
+                          <p className="text-[11px]">Pilih menu makanan atau produk di samping untuk memulai transaksi</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Diskon & Pajak PB1 */}
+                    <div className="pt-3 border-t border-slate-100 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Diskon / Potongan (Rp):</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={posDiscount}
+                          onChange={e => setPosDiscount(parseInt(e.target.value) || 0)}
+                          className="w-28 px-2.5 py-1 text-right rounded-lg border border-slate-300 font-bold"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Pajak Resto PB1 (10%):</span>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={posTaxEnabled}
+                            onChange={e => setPosTaxEnabled(e.target.checked)}
+                            className="rounded accent-emerald-600 w-4 h-4"
+                          />
+                          <span className="font-bold text-slate-700">
+                            {posTaxEnabled ? `+Rp ${cartTax.toLocaleString('id-ID')}` : 'Nonaktif'}
+                          </span>
+                        </label>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200 space-y-1">
+                        <div className="flex justify-between text-slate-500 text-[11px]">
+                          <span>Subtotal Item:</span>
+                          <span>Rp {cartSubtotal.toLocaleString('id-ID')}</span>
+                        </div>
+                        {posDiscount > 0 && (
+                          <div className="flex justify-between text-rose-600 text-[11px] font-bold">
+                            <span>Diskon:</span>
+                            <span>-Rp {posDiscount.toLocaleString('id-ID')}</span>
+                          </div>
+                        )}
+                        {posTaxEnabled && (
+                          <div className="flex justify-between text-slate-600 text-[11px]">
+                            <span>Pajak (10%):</span>
+                            <span>+Rp {cartTax.toLocaleString('id-ID')}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-baseline pt-1">
+                          <span className="font-black text-slate-900 text-sm">TOTAL TAGIHAN:</span>
+                          <span className="font-black text-emerald-700 text-xl">
+                            Rp {cartTotal.toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Checkout & Clear Buttons */}
+                    <div className="pt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleClearCart}
+                        disabled={posCart.length === 0}
+                        className="py-3 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition disabled:opacity-50"
+                        title="Kosongkan keranjang"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenCheckout}
+                        disabled={posCart.length === 0}
+                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <Receipt className="w-4 h-4" />
+                        <span>Bayar Sekarang (Rp {cartTotal.toLocaleString('id-ID')})</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= SUB-VIEW 2: LAPORAN KEUANGAN TERPADU ================= */}
+              {posSubView === 'REPORTS' && (
+                <div className="space-y-6">
+                  {/* Integrated Report Header */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block">
+                          Laporan Keuangan Terpadu 1 Pintu
+                        </span>
+                        <h3 className="font-black text-slate-900 text-lg">
+                          Rekap Penjualan Kasir Offline & Pesanan Online AZ GO
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Data transaksi real-time per hari ini: {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => alert('🖨️ Mencetak Rekap Harian Z-Report Kasir ke printer thermal...')}
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition"
+                      >
+                        <Printer className="w-4 h-4 text-emerald-400" />
+                        <span>Cetak Rekap Kasir (Z-Report)</span>
+                      </button>
+                    </div>
+
+                    {/* Integrated KPI Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                      {/* 1. Offline POS Sales */}
+                      <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-1">
+                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                          <Receipt className="w-4 h-4 text-emerald-600" /> Penjualan Kasir Offline (POS)
+                        </span>
+                        <p className="text-2xl font-black text-emerald-950">
+                          Rp {posSalesHistory.reduce((sum, s) => sum + s.total, 0).toLocaleString('id-ID')}
+                        </p>
+                        <span className="text-[11px] text-emerald-700 font-medium block">
+                          Total {posSalesHistory.length} transaksi kasir toko
+                        </span>
+                      </div>
+
+                      {/* 2. Online AZGO Orders */}
+                      <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-200 space-y-1">
+                        <span className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+                          <ChefHat className="w-4 h-4 text-indigo-600" /> Pesanan Online AZ GO Delivery
+                        </span>
+                        <p className="text-2xl font-black text-indigo-950">
+                          Rp {orders.filter(o => o.status === 'COMPLETED').reduce((sum, o) => sum + o.total, 0).toLocaleString('id-ID')}
+                        </p>
+                        <span className="text-[11px] text-indigo-700 font-medium block">
+                          Total {orders.filter(o => o.status === 'COMPLETED').length} pesanan online selesai
+                        </span>
+                      </div>
+
+                      {/* 3. Combined Total */}
+                      <div className="p-4 bg-gradient-to-br from-slate-900 to-emerald-950 text-white rounded-2xl border border-slate-800 space-y-1 shadow-md">
+                        <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-emerald-400" /> TOTAL OMSET BERSIH TOKO
+                        </span>
+                        <p className="text-2xl font-black text-white">
+                          Rp {(
+                            posSalesHistory.reduce((sum, s) => sum + s.total, 0) +
+                            orders.filter(o => o.status === 'COMPLETED').reduce((sum, o) => sum + o.total, 0)
+                          ).toLocaleString('id-ID')}
+                        </p>
+                        <span className="text-[11px] text-slate-300 font-medium block">
+                          Gabungan offline kasir + online delivery
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Riwayat Struk POS Hari Ini */}
+                  <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
+                    <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                      <History className="w-4 h-4 text-emerald-600" />
+                      Riwayat Transaksi Kasir Toko Hari Ini ({posSalesHistory.length})
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-400 uppercase font-black text-[10px] tracking-wider border-y border-slate-100">
+                          <tr>
+                            <th className="py-3 px-3">Jam & No. Struk</th>
+                            <th className="py-3 px-3">Tipe / Meja</th>
+                            <th className="py-3 px-3">Pelanggan</th>
+                            <th className="py-3 px-3">Item Pembelian</th>
+                            <th className="py-3 px-3">Metode Bayar</th>
+                            <th className="py-3 px-3 text-right">Total Bayar</th>
+                            <th className="py-3 px-3 text-center">Aksi Struk</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {posSalesHistory.map(sale => (
+                            <tr key={sale.id} className="hover:bg-slate-50 transition">
+                              <td className="py-3.5 px-3">
+                                <span className="font-bold text-slate-900 block font-mono">{sale.receiptNumber}</span>
+                                <span className="text-[10px] text-slate-400">{sale.time} WIB</span>
+                              </td>
+                              <td className="py-3.5 px-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  sale.orderType === 'DINE_IN' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                                }`}>
+                                  {sale.orderType === 'DINE_IN' ? `Makan (${sale.tableNumber})` : 'Bungkus'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-3 font-medium text-slate-700">
+                                {sale.customerName || 'Walk-In'}
+                              </td>
+                              <td className="py-3.5 px-3 text-slate-600 max-w-xs truncate">
+                                {sale.items.map((it: any) => `${it.qty}x ${it.name}`).join(', ')}
+                              </td>
+                              <td className="py-3.5 px-3">
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700">
+                                  {sale.payMethod}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-3 text-right font-black text-slate-900">
+                                Rp {sale.total.toLocaleString('id-ID')}
+                              </td>
+                              <td className="py-3.5 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setCompletedPosSale(sale)}
+                                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition"
+                                >
+                                  <Receipt className="w-3 h-3 text-slate-500" />
+                                  <span>Buka Struk</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1555,6 +2725,372 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PEMBAYARAN KASIR POS ================= */}
+      {showPosPaymentModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-emerald-600" />
+                  Pembayaran Kasir
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {posOrderType === 'DINE_IN' ? `Makan di Tempat (${posTableNumber || 'Meja 01'})` : 'Bungkus / Takeaway'}
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowPosPaymentModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Total Display */}
+            <div className="p-4 bg-slate-900 text-white rounded-2xl text-center space-y-1">
+              <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Total Tagihan Pembeli</span>
+              <p className="text-3xl font-black text-emerald-400">
+                Rp {cartTotal.toLocaleString('id-ID')}
+              </p>
+            </div>
+
+            {/* Pilihan Metode Bayar */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setPosPayMethod('CASH')}
+                className={`py-2.5 px-2 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 ${
+                  posPayMethod === 'CASH'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>Tunai (Cash)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPosPayMethod('QRIS')}
+                className={`py-2.5 px-2 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 ${
+                  posPayMethod === 'QRIS'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <QrCode className="w-4 h-4" />
+                <span>QRIS</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPosPayMethod('DEBIT')}
+                className={`py-2.5 px-2 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 ${
+                  posPayMethod === 'DEBIT'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Debit / EDC</span>
+              </button>
+            </div>
+
+            {/* Form Input Sesuai Metode */}
+            {posPayMethod === 'CASH' && (
+              <div className="space-y-3 pt-2 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Uang Tunai Diterima (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    value={posCashTendered}
+                    onChange={e => setPosCashTendered(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-base font-black text-slate-900"
+                  />
+                </div>
+
+                {/* Quick Cash Buttons */}
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setPosCashTendered(cartTotal)}
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold"
+                  >
+                    Uang Pas
+                  </button>
+                  {[20000, 50000, 100000, 200000].filter(n => n >= cartTotal).map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setPosCashTendered(amt)}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold"
+                    >
+                      Rp {amt.toLocaleString('id-ID')}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Kembalian Display */}
+                <div className={`p-3 rounded-2xl border text-xs flex justify-between items-center ${
+                  cashChange >= 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}>
+                  <span className="font-bold">Kembalian:</span>
+                  <span className="font-black text-sm">
+                    {cashChange >= 0 
+                      ? `Rp ${cashChange.toLocaleString('id-ID')}` 
+                      : `Kurang Rp ${Math.abs(posCashTendered - cartTotal).toLocaleString('id-ID')}`}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {posPayMethod === 'QRIS' && (
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center space-y-2 text-xs">
+                <QrCode className="w-24 h-24 text-slate-800 mx-auto" />
+                <p className="font-bold text-slate-800 text-xs">Arahkan Pelanggan untuk Scan Barcode QRIS</p>
+                <p className="text-[11px] text-slate-500">
+                  Pembayaran akan masuk langsung ke saldo kasir toko secara otomatis.
+                </p>
+              </div>
+            )}
+
+            {posPayMethod === 'DEBIT' && (
+              <div className="space-y-2 pt-2 text-xs">
+                <label className="block font-bold text-slate-700">Nomor Referensi Mesin EDC / Approval Code</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: REF-BCA-88992"
+                  value={posDebitRef}
+                  onChange={e => setPosDebitRef(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
+                />
+              </div>
+            )}
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPosPaymentModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPosPayment}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Selesaikan Transaksi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL STRUK DIGITAL & SHARE WHATSAPP ================= */}
+      {completedPosSale && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header Thermal Struk */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 font-mono text-[11px] space-y-2.5 text-slate-800">
+              <div className="text-center space-y-0.5 border-b border-dashed border-slate-300 pb-2">
+                <h4 className="font-black text-sm uppercase text-slate-900">
+                  {selectedStoreType === 'FOOD' ? 'Ayam Geprek Juara' : 'Az Mart Sudirman'}
+                </h4>
+                <p className="text-[10px] text-slate-500">Jl. Merdeka Barat No. 12</p>
+                <p className="text-[10px] text-slate-500">No: {completedPosSale.receiptNumber}</p>
+                <p className="text-[10px] text-slate-400">{completedPosSale.date} {completedPosSale.time} WIB</p>
+                <p className="text-[10px] font-bold text-slate-600">
+                  {completedPosSale.orderType === 'DINE_IN' ? `Dine-In (${completedPosSale.tableNumber})` : 'Takeaway'} • Kasir: {completedPosSale.cashierName}
+                </p>
+              </div>
+
+              {/* Items Struk */}
+              <div className="space-y-1 py-1 border-b border-dashed border-slate-300">
+                {completedPosSale.items.map((it: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-start">
+                    <span>{it.qty}x {it.name}</span>
+                    <span className="font-bold shrink-0">Rp {(it.qty * it.price).toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Calculation */}
+              <div className="space-y-0.5 pt-1">
+                <div className="flex justify-between text-slate-500">
+                  <span>Subtotal:</span>
+                  <span>Rp {completedPosSale.subtotal.toLocaleString('id-ID')}</span>
+                </div>
+                {completedPosSale.discount > 0 && (
+                  <div className="flex justify-between text-rose-600 font-bold">
+                    <span>Diskon:</span>
+                    <span>-Rp {completedPosSale.discount.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                {completedPosSale.tax > 0 && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Pajak (10%):</span>
+                    <span>+Rp {completedPosSale.tax.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-black text-xs text-slate-900 pt-1 border-t border-slate-300">
+                  <span>TOTAL:</span>
+                  <span>Rp {completedPosSale.total.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-slate-500 text-[10px] pt-0.5">
+                  <span>Bayar ({completedPosSale.payMethod}):</span>
+                  <span>Rp {completedPosSale.cashTendered.toLocaleString('id-ID')}</span>
+                </div>
+                {completedPosSale.payMethod === 'CASH' && (
+                  <div className="flex justify-between text-slate-700 text-[10px] font-bold">
+                    <span>Kembalian:</span>
+                    <span>Rp {completedPosSale.cashChange.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center pt-2 border-t border-dashed border-slate-300 text-[10px] text-slate-400">
+                <p>Terima kasih atas kunjungan Anda!</p>
+                <p>Powered by AZGO POS SuperApp</p>
+              </div>
+            </div>
+
+            {/* Action Buttons: Cetak & Share WhatsApp */}
+            <div className="space-y-2 pt-1 text-xs">
+              <button
+                type="button"
+                onClick={() => alert(`🖨️ Mencetak Struk #${completedPosSale.receiptNumber} ke printer kasir thermal...`)}
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Printer className="w-4 h-4 text-emerald-400" />
+                <span>Cetak Struk Thermal (Bluetooth)</span>
+              </button>
+
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
+                <span className="font-bold text-emerald-950 flex items-center gap-1.5 text-[11px]">
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                  Kirim Struk Digital via WhatsApp
+                </span>
+                <div className="flex gap-1.5">
+                  <input
+                    type="tel"
+                    placeholder="No. WhatsApp (0812xxxx)"
+                    value={buyerWaPhone}
+                    onChange={e => setBuyerWaPhone(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white rounded-xl border border-slate-300 text-xs font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleShareWhatsAppReceipt(completedPosSale, buyerWaPhone)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shrink-0 transition"
+                  >
+                    Kirim
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCompletedPosSale(null);
+                  setBuyerWaPhone('');
+                }}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl transition text-center"
+              >
+                Transaksi Baru (Selesai)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PERPANJANG / UPGRADE PAKET POS ================= */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  Perpanjang / Upgrade Paket POS
+                </h3>
+                <p className="text-xs text-slate-500">Pilih perpanjangan bulanan atau tahunan</p>
+              </div>
+              <button onClick={() => setShowUpgradeModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <label
+                onClick={() => setSelectedPosPkg('MONTHLY')}
+                className={`p-3.5 rounded-2xl border-2 cursor-pointer flex justify-between items-center transition ${
+                  selectedPosPkg === 'MONTHLY' ? 'border-emerald-600 bg-emerald-50/50' : 'border-slate-200'
+                }`}
+              >
+                <div>
+                  <h5 className="font-extrabold text-slate-900">Paket Bulanan (30 Hari)</h5>
+                  <p className="text-[11px] text-slate-500">Fleksibel bayar bulanan</p>
+                </div>
+                <span className="font-black text-slate-900 text-sm">Rp 79.000</span>
+              </label>
+
+              <label
+                onClick={() => setSelectedPosPkg('ANNUAL')}
+                className={`p-3.5 rounded-2xl border-2 cursor-pointer flex justify-between items-center transition ${
+                  selectedPosPkg === 'ANNUAL' ? 'border-amber-500 bg-amber-50/50' : 'border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h5 className="font-extrabold text-slate-900">Paket Tahunan (365 Hari)</h5>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-200 text-amber-900">
+                      HEMAT 2 BLN
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">Setara Rp 65.800 / bulan</p>
+                </div>
+                <span className="font-black text-slate-900 text-sm">Rp 790.000</span>
+              </label>
+            </div>
+
+            {/* Upload bukti transfer */}
+            <div className="space-y-2 text-xs pt-1">
+              <label className="block font-bold text-slate-700">Unggah Bukti Transfer Bank / QRIS</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleUploadPosProof}
+                className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-800"
+              />
+              {posPaymentProofName && (
+                <p className="text-[11px] text-emerald-700 font-semibold">✓ {posPaymentProofName}</p>
+              )}
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={posSubmitLoading || !posPaymentProofUrl}
+                onClick={() => handleRequestPosSubscription(selectedPosPkg)}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition disabled:opacity-50"
+              >
+                {posSubmitLoading ? 'Mengirim...' : 'Kirim Pengajuan'}
+              </button>
+            </div>
           </div>
         </div>
       )}
