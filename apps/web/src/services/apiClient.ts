@@ -1,4 +1,4 @@
-import { UserRole } from '@delivery/shared';
+import { UserRole, Voucher, CreateVoucherInput, UpdateVoucherInput, ValidateVoucherResult } from '@delivery/shared';
 import { 
   MOCK_USERS, 
   MOCK_RESTAURANTS, 
@@ -12,7 +12,8 @@ import {
   MOCK_COMMISSION_CONFIG, 
   MOCK_WITHDRAWALS, 
   MOCK_PARTNER_APPLICATIONS,
-  MOCK_POS_SUBSCRIPTIONS 
+  MOCK_POS_SUBSCRIPTIONS,
+  MOCK_VOUCHERS
 } from './mockBackend';
 import { getSupabase } from './supabaseClient';
 
@@ -1401,6 +1402,294 @@ export const api = {
         success: true,
         data: found || null
       };
+    });
+  },
+
+  // 12. Manajemen Voucher & Promo
+  async getVouchers(): Promise<{ success: boolean; data: Voucher[] }> {
+    return safeFetch('/vouchers', undefined, () => {
+      const vouchers = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_vouchers') || 'null') || [...MOCK_VOUCHERS])
+        : getRealStorage<Voucher[]>('azgo_real_vouchers', [...MOCK_VOUCHERS]);
+      return {
+        success: true,
+        data: vouchers
+      };
+    });
+  },
+
+  async createVoucher(data: CreateVoucherInput): Promise<{ success: boolean; message: string; data: Voucher }> {
+    return safeFetch('/admin/vouchers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }, () => {
+      let vouchers: Voucher[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_vouchers') || 'null') || [...MOCK_VOUCHERS])
+        : getRealStorage<Voucher[]>('azgo_real_vouchers', [...MOCK_VOUCHERS]);
+
+      const existing = vouchers.find(v => v.code.toUpperCase() === data.code.trim().toUpperCase());
+      if (existing) {
+        throw new Error(`Kode voucher "${data.code}" sudah ada. Silakan gunakan kode lain.`);
+      }
+
+      const newVoucher: Voucher = {
+        id: `vch-${Date.now()}`,
+        code: data.code.trim().toUpperCase(),
+        title: data.title.trim(),
+        description: data.description?.trim(),
+        discountType: data.discountType,
+        discountValue: Number(data.discountValue),
+        maxDiscountAmount: data.maxDiscountAmount ? Number(data.maxDiscountAmount) : undefined,
+        minOrderAmount: Number(data.minOrderAmount) || 0,
+        usageLimit: data.usageLimit ? Number(data.usageLimit) : undefined,
+        usedCount: 0,
+        isActive: data.isActive !== false,
+        applicableService: data.applicableService || 'ALL',
+        validFrom: data.validFrom || new Date().toISOString(),
+        validUntil: data.validUntil || new Date(Date.now() + 30 * 86400000).toISOString(),
+        createdAt: new Date().toISOString()
+      };
+
+      vouchers = [newVoucher, ...vouchers];
+      if (isCurrentDemoMode()) {
+        localStorage.setItem('azgo_demo_vouchers', JSON.stringify(vouchers));
+      } else {
+        setRealStorage('azgo_real_vouchers', vouchers);
+      }
+
+      return {
+        success: true,
+        message: `Voucher ${newVoucher.code} berhasil ditambahkan!`,
+        data: newVoucher
+      };
+    });
+  },
+
+  async updateVoucher(id: string, data: UpdateVoucherInput): Promise<{ success: boolean; message: string; data: Voucher }> {
+    return safeFetch(`/admin/vouchers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }, () => {
+      let vouchers: Voucher[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_vouchers') || 'null') || [...MOCK_VOUCHERS])
+        : getRealStorage<Voucher[]>('azgo_real_vouchers', [...MOCK_VOUCHERS]);
+
+      const idx = vouchers.findIndex(v => v.id === id);
+      if (idx === -1) throw new Error('Voucher tidak ditemukan');
+
+      const updated: Voucher = {
+        ...vouchers[idx],
+        ...data,
+        code: data.code ? data.code.trim().toUpperCase() : vouchers[idx].code,
+        updatedAt: new Date().toISOString()
+      };
+
+      vouchers[idx] = updated;
+      if (isCurrentDemoMode()) {
+        localStorage.setItem('azgo_demo_vouchers', JSON.stringify(vouchers));
+      } else {
+        setRealStorage('azgo_real_vouchers', vouchers);
+      }
+
+      return {
+        success: true,
+        message: `Voucher ${updated.code} berhasil diperbarui!`,
+        data: updated
+      };
+    });
+  },
+
+  async toggleVoucher(id: string): Promise<{ success: boolean; message: string; data: Voucher }> {
+    return safeFetch(`/admin/vouchers/${id}/toggle`, { method: 'PATCH' }, () => {
+      let vouchers: Voucher[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_vouchers') || 'null') || [...MOCK_VOUCHERS])
+        : getRealStorage<Voucher[]>('azgo_real_vouchers', [...MOCK_VOUCHERS]);
+
+      const idx = vouchers.findIndex(v => v.id === id);
+      if (idx === -1) throw new Error('Voucher tidak ditemukan');
+
+      vouchers[idx].isActive = !vouchers[idx].isActive;
+      vouchers[idx].updatedAt = new Date().toISOString();
+
+      if (isCurrentDemoMode()) {
+        localStorage.setItem('azgo_demo_vouchers', JSON.stringify(vouchers));
+      } else {
+        setRealStorage('azgo_real_vouchers', vouchers);
+      }
+
+      return {
+        success: true,
+        message: `Status voucher ${vouchers[idx].code} diubah menjadi ${vouchers[idx].isActive ? 'AKTIF' : 'NONAKTIF'}`,
+        data: vouchers[idx]
+      };
+    });
+  },
+
+  async deleteVoucher(id: string): Promise<{ success: boolean; message: string }> {
+    return safeFetch(`/admin/vouchers/${id}`, { method: 'DELETE' }, () => {
+      let vouchers: Voucher[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_vouchers') || 'null') || [...MOCK_VOUCHERS])
+        : getRealStorage<Voucher[]>('azgo_real_vouchers', [...MOCK_VOUCHERS]);
+
+      vouchers = vouchers.filter(v => v.id !== id);
+      if (isCurrentDemoMode()) {
+        localStorage.setItem('azgo_demo_vouchers', JSON.stringify(vouchers));
+      } else {
+        setRealStorage('azgo_real_vouchers', vouchers);
+      }
+
+      return {
+        success: true,
+        message: 'Voucher berhasil dihapus'
+      };
+    });
+  },
+
+  async validateVoucher(code: string, orderAmount: number, serviceType?: string): Promise<{ success: boolean; data: ValidateVoucherResult }> {
+    return safeFetch(`/vouchers/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, orderAmount, serviceType })
+    }, () => {
+      const vouchers: Voucher[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_vouchers') || 'null') || [...MOCK_VOUCHERS])
+        : getRealStorage<Voucher[]>('azgo_real_vouchers', [...MOCK_VOUCHERS]);
+
+      const cleanCode = code.trim().toUpperCase();
+      const voucher = vouchers.find(v => v.code.toUpperCase() === cleanCode);
+
+      if (!voucher) {
+        return {
+          success: false,
+          data: {
+            isValid: false,
+            message: `Kode voucher "${cleanCode}" tidak ditemukan atau salah.`,
+            discountAmount: 0,
+            finalAmount: orderAmount
+          }
+        };
+      }
+
+      if (!voucher.isActive) {
+        return {
+          success: false,
+          data: {
+            isValid: false,
+            message: `Voucher "${cleanCode}" saat ini sedang dinonaktifkan.`,
+            discountAmount: 0,
+            finalAmount: orderAmount,
+            voucher
+          }
+        };
+      }
+
+      // Cek Masa Berlaku
+      const now = new Date().getTime();
+      if (voucher.validUntil && new Date(voucher.validUntil).getTime() < now) {
+        return {
+          success: false,
+          data: {
+            isValid: false,
+            message: `Voucher "${cleanCode}" telah kedaluwarsa pada ${new Date(voucher.validUntil).toLocaleDateString('id-ID')}.`,
+            discountAmount: 0,
+            finalAmount: orderAmount,
+            voucher
+          }
+        };
+      }
+
+      // Cek Kuota Pemakaian
+      if (voucher.usageLimit && voucher.usedCount >= voucher.usageLimit) {
+        return {
+          success: false,
+          data: {
+            isValid: false,
+            message: `Kuota penggunaan voucher "${cleanCode}" telah habis.`,
+            discountAmount: 0,
+            finalAmount: orderAmount,
+            voucher
+          }
+        };
+      }
+
+      // Cek Minimal Transaksi
+      if (orderAmount < voucher.minOrderAmount) {
+        return {
+          success: false,
+          data: {
+            isValid: false,
+            message: `Minimal transaksi untuk voucher ini adalah Rp ${voucher.minOrderAmount.toLocaleString('id-ID')}.`,
+            discountAmount: 0,
+            finalAmount: orderAmount,
+            voucher
+          }
+        };
+      }
+
+      // Cek Kesesuaian Layanan
+      if (voucher.applicableService !== 'ALL' && serviceType && voucher.applicableService !== serviceType) {
+        return {
+          success: false,
+          data: {
+            isValid: false,
+            message: `Voucher ini hanya berlaku untuk layanan ${voucher.applicableService}.`,
+            discountAmount: 0,
+            finalAmount: orderAmount,
+            voucher
+          }
+        };
+      }
+
+      // Hitung Diskon
+      let discount = 0;
+      if (voucher.discountType === 'PERCENTAGE') {
+        discount = Math.round((orderAmount * voucher.discountValue) / 100);
+        if (voucher.maxDiscountAmount && discount > voucher.maxDiscountAmount) {
+          discount = voucher.maxDiscountAmount;
+        }
+      } else {
+        discount = voucher.discountValue;
+      }
+
+      discount = Math.min(discount, orderAmount);
+      const finalAmount = Math.max(0, orderAmount - discount);
+
+      return {
+        success: true,
+        data: {
+          isValid: true,
+          message: `Voucher "${voucher.code}" berhasil diterapkan! Hemat Rp ${discount.toLocaleString('id-ID')}`,
+          discountAmount: discount,
+          finalAmount,
+          voucher
+        }
+      };
+    });
+  },
+
+  async recordVoucherUsage(code: string): Promise<{ success: boolean }> {
+    return safeFetch('/vouchers/use', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    }, () => {
+      let vouchers: Voucher[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem('azgo_demo_vouchers') || 'null') || [...MOCK_VOUCHERS])
+        : getRealStorage<Voucher[]>('azgo_real_vouchers', [...MOCK_VOUCHERS]);
+
+      const target = vouchers.find(v => v.code.toUpperCase() === code.trim().toUpperCase());
+      if (target) {
+        target.usedCount = (target.usedCount || 0) + 1;
+        if (isCurrentDemoMode()) {
+          localStorage.setItem('azgo_demo_vouchers', JSON.stringify(vouchers));
+        } else {
+          setRealStorage('azgo_real_vouchers', vouchers);
+        }
+      }
+
+      return { success: true };
     });
   }
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   QrCode, 
@@ -14,9 +14,16 @@ import {
   FileImage,
   Trash2,
   Eye,
-  AlertCircle
+  AlertCircle,
+  Tag,
+  Sparkles,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Gift
 } from 'lucide-react';
-import { User } from '@delivery/shared';
+import { User, Voucher, VoucherServiceScope } from '@delivery/shared';
+import { api } from '../services/apiClient';
 
 export type PaymentMethodType = 'QRIS' | 'CASH';
 
@@ -27,6 +34,7 @@ export interface OrderPaymentModalProps {
   merchantName?: string;
   orderNumber?: string;
   totalAmount: number;
+  serviceType?: VoucherServiceScope;
   currentUser?: User | null;
   onRequestLogin?: () => void;
   onConfirmPayment: (paymentMethod: PaymentMethodType, details: {
@@ -36,6 +44,9 @@ export interface OrderPaymentModalProps {
     paymentProofUrl?: string;
     paymentProofName?: string;
     senderAccountName?: string;
+    voucherCode?: string;
+    discountAmount?: number;
+    finalAmount?: number;
   }) => void;
 }
 
@@ -46,6 +57,7 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
   merchantName,
   orderNumber = `AZD-${Math.floor(100000 + Math.random() * 900000)}`,
   totalAmount,
+  serviceType,
   currentUser,
   onRequestLogin,
   onConfirmPayment
@@ -55,6 +67,27 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
   const [customCashAmount, setCustomCashAmount] = useState<number>(totalAmount);
   const [copiedNominal, setCopiedNominal] = useState(false);
   const [qrisSimulating, setQrisSimulating] = useState(false);
+
+  // Voucher & Promo State
+  const [voucherCodeInput, setVoucherCodeInput] = useState<string>('');
+  const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
+  const [voucherDiscount, setVoucherDiscount] = useState<number>(0);
+  const [voucherMessage, setVoucherMessage] = useState<string>('');
+  const [voucherError, setVoucherError] = useState<string>('');
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState<boolean>(false);
+  const [showVoucherList, setShowVoucherList] = useState<boolean>(false);
+  const [availableVouchers, setAvailableVouchers] = useState<Voucher[]>([]);
+
+  // Tentukan serviceType jika tidak diberikan eksplisit
+  const resolvedServiceType: VoucherServiceScope = serviceType || (() => {
+    const t = (orderTitle || '').toLowerCase();
+    if (t.includes('kargo') || t.includes('cargo')) return 'AZ_CARGO';
+    if (t.includes('mobil') || t.includes('car')) return 'AZ_CAR';
+    if (t.includes('penumpang') || t.includes('ride') || t.includes('motor') || t.includes('perjalanan')) return 'AZ_RIDE';
+    if (t.includes('mart') || t.includes('belanja')) return 'AZ_MART';
+    if (t.includes('express') || t.includes('resi') || t.includes('paket')) return 'AZ_EXPRESS';
+    return 'AZ_DELIVERY';
+  })();
 
   // Bukti Pembayaran QRIS State
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
@@ -72,21 +105,92 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
     return null;
   });
 
+  // Load daftar voucher yang aktif dan berlaku
+  useEffect(() => {
+    if (isOpen) {
+      api.getVouchers().then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          const now = new Date();
+          const activeList = res.data.filter(v => {
+            if (!v.isActive) return false;
+            if (v.validUntil && new Date(v.validUntil) < now) return false;
+            if (v.usageLimit && v.usedCount >= v.usageLimit) return false;
+            if (v.applicableService !== 'ALL' && v.applicableService !== resolvedServiceType) return false;
+            return true;
+          });
+          setAvailableVouchers(activeList);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, resolvedServiceType]);
+
+  // Total efektif setelah diskon voucher
+  const effectiveTotal = Math.max(0, totalAmount - voucherDiscount);
+
+  // Sinkronisasi customCashAmount dengan effectiveTotal jika berubah
+  useEffect(() => {
+    if (customCashAmount < effectiveTotal) {
+      setCustomCashAmount(effectiveTotal);
+    }
+  }, [effectiveTotal]);
+
   if (!isOpen) return null;
 
   const handleCopyNominal = () => {
-    navigator.clipboard?.writeText(totalAmount.toString());
+    navigator.clipboard?.writeText(effectiveTotal.toString());
     setCopiedNominal(true);
     setTimeout(() => setCopiedNominal(false), 2000);
   };
 
+  const handleApplyVoucher = async (codeToApply?: string) => {
+    const code = (codeToApply || voucherCodeInput).trim().toUpperCase();
+    if (!code) {
+      setVoucherError('Silakan masukkan kode voucher terlebih dahulu');
+      return;
+    }
+
+    setIsValidatingVoucher(true);
+    setVoucherError('');
+    setVoucherMessage('');
+
+    try {
+      const res = await api.validateVoucher(code, totalAmount, resolvedServiceType);
+      if (res.success && res.data.isValid && res.data.voucher) {
+        setAppliedVoucher(res.data.voucher);
+        setVoucherDiscount(res.data.discountAmount);
+        setVoucherMessage(res.data.message);
+        setVoucherCodeInput(code);
+        setVoucherError('');
+        setShowVoucherList(false);
+      } else {
+        setAppliedVoucher(null);
+        setVoucherDiscount(0);
+        setVoucherError(res.data.message || `Kode voucher "${code}" tidak dapat digunakan untuk pesanan ini.`);
+      }
+    } catch (err: any) {
+      setAppliedVoucher(null);
+      setVoucherDiscount(0);
+      setVoucherError(err.message || 'Gagal memvalidasi kode voucher.');
+    } finally {
+      setIsValidatingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherDiscount(0);
+    setVoucherMessage('');
+    setVoucherError('');
+    setVoucherCodeInput('');
+  };
+
   const getCashChange = () => {
-    let tendered = totalAmount;
+    let tendered = effectiveTotal;
     if (cashTenderedType === '50K') tendered = 50000;
     else if (cashTenderedType === '100K') tendered = 100000;
     else if (cashTenderedType === 'CUSTOM') tendered = customCashAmount;
 
-    const change = tendered - totalAmount;
+    const change = tendered - effectiveTotal;
     return change > 0 ? change : 0;
   };
 
@@ -127,7 +231,7 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
   <text x="200" y="148" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#64748b" text-anchor="middle">AZ GO PAY • ID1029384756209</text>
   <line x1="36" y1="170" x2="364" y2="170" stroke="#e2e8f0" stroke-dasharray="6 6"/>
   <text x="44" y="205" font-family="sans-serif" font-size="11" fill="#64748b">Total Pembayaran</text>
-  <text x="356" y="205" font-family="sans-serif" font-size="16" font-weight="800" fill="#e11d48" text-anchor="end">Rp ${totalAmount.toLocaleString('id-ID')}</text>
+  <text x="356" y="205" font-family="sans-serif" font-size="16" font-weight="800" fill="#e11d48" text-anchor="end">Rp ${effectiveTotal.toLocaleString('id-ID')}</text>
   <text x="44" y="240" font-family="sans-serif" font-size="11" fill="#64748b">Penerima (Merchant)</text>
   <text x="356" y="240" font-family="sans-serif" font-size="11" font-weight="700" fill="#0f172a" text-anchor="end">${merchantName || 'Mitra Toko / Resto'}</text>
   <text x="44" y="275" font-family="sans-serif" font-size="11" fill="#64748b">ID Transaksi / Order</text>
@@ -148,7 +252,16 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
     setProofError('');
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    // Record voucher usage if voucher applied
+    if (appliedVoucher) {
+      try {
+        await api.recordVoucherUsage(appliedVoucher.code);
+      } catch (e) {
+        console.error('Failed recording voucher usage', e);
+      }
+    }
+
     if (selectedMethod === 'QRIS') {
       if (!paymentProofPreview) {
         setProofError('Wajib mengunggah bukti pembayaran atau screenshot struk transfer QRIS sebelum melanjutkan.');
@@ -159,25 +272,31 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
       setTimeout(() => {
         setQrisSimulating(false);
         onConfirmPayment('QRIS', {
-          methodLabel: `QRIS Lunas (${senderAccountName ? 'a.n ' + senderAccountName + ' - ' : ''}Bukti Terlampir)`,
+          methodLabel: `QRIS Lunas (${senderAccountName ? 'a.n ' + senderAccountName + ' - ' : ''}Bukti Terlampir)${appliedVoucher ? ' [Voucher: ' + appliedVoucher.code + ']' : ''}`,
           isPaid: true,
           paymentProofUrl: paymentProofPreview,
           paymentProofName: paymentProofName,
-          senderAccountName: senderAccountName
+          senderAccountName: senderAccountName,
+          voucherCode: appliedVoucher?.code,
+          discountAmount: voucherDiscount,
+          finalAmount: effectiveTotal
         });
       }, 700);
     } else {
       let changeNote = 'Uang pas';
-      if (cashTenderedType === '50K') changeNote = `Uang Rp 50.000 (Kembalian Rp ${(50000 - totalAmount).toLocaleString('id-ID')})`;
-      else if (cashTenderedType === '100K') changeNote = `Uang Rp 100.000 (Kembalian Rp ${(100000 - totalAmount).toLocaleString('id-ID')})`;
-      else if (cashTenderedType === 'CUSTOM' && customCashAmount > totalAmount) {
-        changeNote = `Uang Rp ${customCashAmount.toLocaleString('id-ID')} (Kembalian Rp ${(customCashAmount - totalAmount).toLocaleString('id-ID')})`;
+      if (cashTenderedType === '50K') changeNote = `Uang Rp 50.000 (Kembalian Rp ${(50000 - effectiveTotal).toLocaleString('id-ID')})`;
+      else if (cashTenderedType === '100K') changeNote = `Uang Rp 100.000 (Kembalian Rp ${(100000 - effectiveTotal).toLocaleString('id-ID')})`;
+      else if (cashTenderedType === 'CUSTOM' && customCashAmount > effectiveTotal) {
+        changeNote = `Uang Rp ${customCashAmount.toLocaleString('id-ID')} (Kembalian Rp ${(customCashAmount - effectiveTotal).toLocaleString('id-ID')})`;
       }
 
       onConfirmPayment('CASH', {
-        methodLabel: `Tunai / COD saat pesanan tiba (${changeNote})`,
+        methodLabel: `Tunai / COD saat pesanan tiba (${changeNote})${appliedVoucher ? ' [Voucher: ' + appliedVoucher.code + ']' : ''}`,
         cashChangeNote: changeNote,
-        isPaid: false
+        isPaid: false,
+        voucherCode: appliedVoucher?.code,
+        discountAmount: voucherDiscount,
+        finalAmount: effectiveTotal
       });
     }
   };
@@ -209,9 +328,22 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
         <div className="bg-amber-50/90 border-b border-amber-200/80 p-3.5 sm:p-4 flex items-center justify-between shrink-0 z-10">
           <div>
             <span className="text-xs text-amber-800 font-semibold block">Total yang Harus Dibayar:</span>
-            <div className="text-xl sm:text-2xl font-black text-amber-700">
-              Rp {totalAmount.toLocaleString('id-ID')}
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl sm:text-2xl font-black text-amber-700">
+                Rp {effectiveTotal.toLocaleString('id-ID')}
+              </span>
+              {voucherDiscount > 0 && (
+                <span className="line-through text-slate-400 text-xs font-semibold">
+                  Rp {totalAmount.toLocaleString('id-ID')}
+                </span>
+              )}
             </div>
+            {voucherDiscount > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full mt-0.5">
+                <Sparkles className="w-3 h-3 text-emerald-600" />
+                Hemat Rp {voucherDiscount.toLocaleString('id-ID')} ({appliedVoucher?.code})
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -263,6 +395,167 @@ export const OrderPaymentModal: React.FC<OrderPaymentModalProps> = ({
               )}
             </div>
           )}
+
+          {/* SEKSI KODE VOUCHER & PROMO */}
+          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-rose-600" />
+                <span>Punya Kode Voucher / Promo?</span>
+              </label>
+              {availableVouchers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowVoucherList(!showVoucherList)}
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                >
+                  <Gift className="w-3 h-3" />
+                  <span>Lihat Promo ({availableVouchers.length})</span>
+                  {showVoucherList ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              )}
+            </div>
+
+            {/* Input & Tombol Terapkan */}
+            {!appliedVoucher ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={voucherCodeInput}
+                      onChange={e => {
+                        setVoucherCodeInput(e.target.value.toUpperCase());
+                        if (voucherError) setVoucherError('');
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleApplyVoucher();
+                        }
+                      }}
+                      placeholder="Masukkan kode (Cth: AZGOHARIINI)"
+                      className="w-full pl-3 pr-3 py-2 bg-white rounded-xl border border-slate-300 text-xs font-mono uppercase font-bold placeholder:font-sans placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:outline-rose-500 focus:border-rose-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyVoucher()}
+                    disabled={isValidatingVoucher || !voucherCodeInput.trim()}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5"
+                  >
+                    {isValidatingVoucher ? (
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    <span>Terapkan</span>
+                  </button>
+                </div>
+
+                {voucherError && (
+                  <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-1.5 font-medium animate-in fade-in">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span>{voucherError}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Voucher Berhasil Diterapkan Card */
+              <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-xl flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="truncate">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-black text-xs text-emerald-950 uppercase tracking-wide">
+                        {appliedVoucher.code}
+                      </span>
+                      <span className="px-1.5 py-0.2 bg-emerald-200 text-emerald-800 rounded font-black text-[9px]">
+                        TERPASANG
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-bold text-emerald-700 truncate">
+                      {voucherMessage || appliedVoucher.title}
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      Potongan: -Rp {voucherDiscount.toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveVoucher}
+                  className="px-2.5 py-1.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-lg text-xs font-bold border border-slate-200 hover:border-rose-200 transition shrink-0 flex items-center gap-1 cursor-pointer shadow-2xs"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              </div>
+            )}
+
+            {/* Collapsible List Voucher yang Sedang Aktif */}
+            {showVoucherList && availableVouchers.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-slate-200 space-y-2 max-h-48 overflow-y-auto pr-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Pilih Voucher Promo yang Tersedia:
+                </span>
+                {availableVouchers.map((v) => {
+                  const isEligible = totalAmount >= (v.minOrderAmount || 0);
+                  const isCurrent = appliedVoucher?.id === v.id;
+                  return (
+                    <div
+                      key={v.id}
+                      className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 transition ${
+                        isCurrent
+                          ? 'bg-emerald-50 border-emerald-300'
+                          : isEligible
+                          ? 'bg-white border-slate-200 hover:border-rose-300 hover:bg-rose-50/20'
+                          : 'bg-slate-100 border-slate-200 opacity-60'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 text-[11px]">
+                            {v.code}
+                          </span>
+                          <span className="font-bold text-slate-800 truncate">{v.title}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          {v.discountType === 'PERCENTAGE'
+                            ? `Diskon ${v.discountValue}% (Maks Rp ${(v.maxDiscountAmount || 0).toLocaleString('id-ID')})`
+                            : `Potongan Langsung Rp ${v.discountValue.toLocaleString('id-ID')}`}
+                          {v.minOrderAmount > 0 ? ` • Min. order Rp ${v.minOrderAmount.toLocaleString('id-ID')}` : ' • Tanpa min. order'}
+                        </p>
+                      </div>
+
+                      <div>
+                        {isCurrent ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Dipakai
+                          </span>
+                        ) : isEligible ? (
+                          <button
+                            type="button"
+                            onClick={() => handleApplyVoucher(v.code)}
+                            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
+                          >
+                            Pakai
+                          </button>
+                        ) : (
+                          <span className="text-[9px] font-semibold text-slate-500 bg-slate-200 px-2 py-1 rounded-lg">
+                            Kurang Rp {(v.minOrderAmount - totalAmount).toLocaleString('id-ID')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Tab Pemilihan Metode: QRIS vs Tunai */}
           <div>

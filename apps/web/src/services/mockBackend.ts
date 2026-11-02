@@ -1,4 +1,4 @@
-import { User } from '@delivery/shared';
+import { User, Voucher } from '@delivery/shared';
 
 // 1. Akun Pengguna Mock
 export const MOCK_USERS: (User & { passwordHash: string })[] = [
@@ -419,6 +419,92 @@ export const MOCK_POS_SUBSCRIPTIONS: any[] = [
     paymentProofName: 'struk_qris_tahunan.jpg',
     requestedAt: new Date(Date.now() - 90 * 60000).toISOString(),
     adminNotes: 'Permohonan paket bundling tahunan (Hemat 2 Bulan)'
+  }
+];
+
+// 12. Daftar Voucher & Promo Mock
+export const MOCK_VOUCHERS: Voucher[] = [
+  {
+    id: 'vch-1',
+    code: 'AZGOHARIINI',
+    title: 'Diskon 20% Pengguna Spesial',
+    description: 'Potongan 20% maksimal Rp 15.000 untuk semua layanan AZ GO',
+    discountType: 'PERCENTAGE',
+    discountValue: 20,
+    maxDiscountAmount: 15000,
+    minOrderAmount: 20000,
+    usageLimit: 500,
+    usedCount: 78,
+    isActive: true,
+    applicableService: 'ALL',
+    validFrom: new Date(Date.now() - 7 * 86400000).toISOString(),
+    validUntil: new Date(Date.now() + 30 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 7 * 86400000).toISOString()
+  },
+  {
+    id: 'vch-2',
+    code: 'HEMAT10K',
+    title: 'Potongan Langsung Rp 10.000',
+    description: 'Diskon tetap Rp 10.000 dengan minimal transaksi Rp 30.000',
+    discountType: 'FIXED',
+    discountValue: 10000,
+    minOrderAmount: 30000,
+    usageLimit: 300,
+    usedCount: 142,
+    isActive: true,
+    applicableService: 'ALL',
+    validFrom: new Date(Date.now() - 5 * 86400000).toISOString(),
+    validUntil: new Date(Date.now() + 25 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 5 * 86400000).toISOString()
+  },
+  {
+    id: 'vch-3',
+    code: 'GRATISONGKIR',
+    title: 'Voucher Gratis Ongkir Rp 12.000',
+    description: 'Potongan ongkos kirim Rp 12.000 untuk pesan makanan dan belanja',
+    discountType: 'FIXED',
+    discountValue: 12000,
+    minOrderAmount: 25000,
+    usageLimit: 1000,
+    usedCount: 389,
+    isActive: true,
+    applicableService: 'ALL',
+    validFrom: new Date(Date.now() - 10 * 86400000).toISOString(),
+    validUntil: new Date(Date.now() + 20 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 10 * 86400000).toISOString()
+  },
+  {
+    id: 'vch-4',
+    code: 'AZGORIDE',
+    title: 'Diskon 50% Naik Ojek & Mobil',
+    description: 'Potongan 50% maksimal Rp 8.000 untuk perjalanan Az Ride & Az Car',
+    discountType: 'PERCENTAGE',
+    discountValue: 50,
+    maxDiscountAmount: 8000,
+    minOrderAmount: 10000,
+    usageLimit: 200,
+    usedCount: 56,
+    isActive: true,
+    applicableService: 'AZ_RIDE',
+    validFrom: new Date(Date.now() - 3 * 86400000).toISOString(),
+    validUntil: new Date(Date.now() + 15 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString()
+  },
+  {
+    id: 'vch-5',
+    code: 'KILAT5K',
+    title: 'Flash Voucher Rp 5.000 (Nonaktif)',
+    description: 'Voucher khusus promo akhir pekan',
+    discountType: 'FIXED',
+    discountValue: 5000,
+    minOrderAmount: 15000,
+    usageLimit: 100,
+    usedCount: 100,
+    isActive: false,
+    applicableService: 'ALL',
+    validFrom: new Date(Date.now() - 14 * 86400000).toISOString(),
+    validUntil: new Date(Date.now() - 2 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 14 * 86400000).toISOString()
   }
 ];
 
