@@ -622,7 +622,100 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
     setShowPosPaymentModal(true);
   };
 
-  const handleConfirmPosPayment = () => {
+  const handlePrintReceipt = (sale: any) => {
+    const storeTitle = currentUser?.fullName || (selectedStoreType === 'FOOD' ? 'Resto Kuliner AZ GO' : 'Az Mart Superstore');
+    const storeAddress = currentUser?.phone ? `Hubungi: ${currentUser.phone}` : 'Jl. Merdeka Barat No. 12';
+
+    const printWindow = window.open('', '_blank', 'width=380,height=600');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const itemsHtml = sale.items.map((it: any) => `
+      <div style="margin-bottom: 4px;">
+        <div style="font-weight: bold;">${it.name}</div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px;">
+          <span>${it.qty} x Rp ${it.price.toLocaleString('id-ID')}</span>
+          <span style="font-weight: bold;">Rp ${(it.qty * it.price).toLocaleString('id-ID')}</span>
+        </div>
+      </div>
+    `).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Struk Nota - ${sale.receiptNumber}</title>
+        <style>
+          @page { size: 58mm auto; margin: 0; }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 58mm;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 8px 6px;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #000000;
+            background: #ffffff;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .double-divider { border-top: 2px dashed #000; margin: 6px 0; }
+          .row { display: flex; justify-content: space-between; margin: 2px 0; }
+          @media print {
+            body { width: 100%; margin: 0; padding: 4px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div class="bold" style="font-size: 13px; text-transform: uppercase;">${storeTitle}</div>
+          <div style="font-size: 10px;">${storeAddress}</div>
+        </div>
+        <div class="divider"></div>
+        <div class="row"><span>No. Nota:</span><span class="bold">${sale.receiptNumber}</span></div>
+        <div class="row"><span>Waktu:</span><span>${sale.date} ${sale.time}</span></div>
+        <div class="row"><span>Kasir:</span><span>${sale.cashierName}</span></div>
+        <div class="row"><span>Tipe:</span><span>${sale.orderType === 'DINE_IN' ? `Dine-In (${sale.tableNumber})` : 'Takeaway'}</span></div>
+        <div class="row"><span>Pelanggan:</span><span>${sale.customerName}</span></div>
+        <div class="divider"></div>
+        <div style="margin: 6px 0;">
+          ${itemsHtml}
+        </div>
+        <div class="divider"></div>
+        <div class="row"><span>Subtotal:</span><span>Rp ${sale.subtotal.toLocaleString('id-ID')}</span></div>
+        ${sale.discount > 0 ? `<div class="row"><span>Diskon:</span><span>-Rp ${sale.discount.toLocaleString('id-ID')}</span></div>` : ''}
+        ${sale.tax > 0 ? `<div class="row"><span>Pajak (10%):</span><span>+Rp ${sale.tax.toLocaleString('id-ID')}</span></div>` : ''}
+        <div class="double-divider"></div>
+        <div class="row bold" style="font-size: 13px;"><span>TOTAL TAGIHAN:</span><span>Rp ${sale.total.toLocaleString('id-ID')}</span></div>
+        <div class="divider"></div>
+        <div class="row"><span>Metode Bayar:</span><span>${sale.payMethod}</span></div>
+        <div class="row"><span>Nominal Bayar:</span><span>Rp ${sale.cashTendered.toLocaleString('id-ID')}</span></div>
+        ${sale.payMethod === 'CASH' ? `<div class="row bold"><span>Kembalian:</span><span>Rp ${sale.cashChange.toLocaleString('id-ID')}</span></div>` : ''}
+        <div class="double-divider"></div>
+        <div class="text-center" style="font-size: 10px; margin-top: 8px;">
+          <div>*** TERIMA KASIH ***</div>
+          <div>Selamat Menikmati & Datang Kembali</div>
+          <div style="margin-top: 5px; font-size: 8px; color: #555;">Powered by AZ GO SuperApp</div>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleConfirmPosPayment = (shouldPrint: boolean = false) => {
     if (posPayMethod === 'CASH' && posCashTendered < cartTotal) {
       alert(`Uang tunai yang diterima (Rp ${posCashTendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${cartTotal.toLocaleString('id-ID')}).`);
       return;
@@ -651,6 +744,12 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
     setShowPosPaymentModal(false);
     handleClearCart();
     setCompletedPosSale(newSale);
+
+    if (shouldPrint) {
+      setTimeout(() => {
+        handlePrintReceipt(newSale);
+      }, 300);
+    }
   };
 
   const handleShareWhatsAppReceipt = (sale: any, phone: string) => {
@@ -2873,21 +2972,39 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
               </div>
             )}
 
-            <div className="pt-2 flex gap-2">
+            <div className="pt-3 space-y-2 border-t border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleConfirmPosPayment(true)}
+                  className="py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl text-xs shadow-lg transition flex items-center justify-center gap-2 group ring-2 ring-slate-900/10 active:scale-[0.98]"
+                >
+                  <Printer className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+                  <div className="text-left">
+                    <span className="block leading-tight font-black">Print Nota & Selesai</span>
+                    <span className="text-[10px] text-slate-300 font-normal">Cetak struk fisik</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleConfirmPosPayment(false)}
+                  className="py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg transition flex items-center justify-center gap-2 group active:scale-[0.98]"
+                >
+                  <Check className="w-4 h-4 group-hover:scale-110 transition-transform shrink-0" />
+                  <div className="text-left">
+                    <span className="block leading-tight font-black">Selesai (Tanpa Print)</span>
+                    <span className="text-[10px] text-emerald-100 font-normal">Simpan transaksi</span>
+                  </div>
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setShowPosPaymentModal(false)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition"
               >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmPosPayment}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-1.5"
-              >
-                <Check className="w-4 h-4" />
-                <span>Selesaikan Transaksi</span>
+                Batal / Kembali ke Kasir
               </button>
             </div>
           </div>
@@ -2966,11 +3083,11 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
             <div className="space-y-2 pt-1 text-xs">
               <button
                 type="button"
-                onClick={() => alert(`🖨️ Mencetak Struk #${completedPosSale.receiptNumber} ke printer kasir thermal...`)}
-                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                onClick={() => handlePrintReceipt(completedPosSale)}
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
               >
                 <Printer className="w-4 h-4 text-emerald-400" />
-                <span>Cetak Struk Thermal (Bluetooth)</span>
+                <span>Cetak Ulang Struk Thermal (Bluetooth)</span>
               </button>
 
               <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
