@@ -1,4 +1,4 @@
-import { UserRole, Voucher, CreateVoucherInput, UpdateVoucherInput, ValidateVoucherResult, PosSubscriptionApplication } from '@delivery/shared';
+import { UserRole, Voucher, CreateVoucherInput, UpdateVoucherInput, ValidateVoucherResult, PosSubscriptionApplication, PosPricingConfig, DEFAULT_POS_PRICING } from '@delivery/shared';
 import { 
   MOCK_USERS, 
   MOCK_RESTAURANTS, 
@@ -1127,7 +1127,8 @@ export const api = {
 
       // Jika mitra Resto/Mart memilih paket bundling POS Kasir
       if (data.type === 'MERCHANT' && data.posSubscriptionRequested && data.posPackageType && data.posPackageType !== 'NONE') {
-        const price = data.posPackageType === 'ANNUAL' ? 790000 : data.posPackageType === 'MONTHLY' ? 79000 : 0;
+        const pricing = this.getPosPricingConfig();
+        const price = data.posPackageType === 'ANNUAL' ? pricing.annualPrice : data.posPackageType === 'MONTHLY' ? pricing.monthlyPrice : 0;
         const newPosSub: PosSubscriptionApplication = {
           id: 'pos-app-' + Date.now(),
           merchantId: newApp.id,
@@ -1443,7 +1444,9 @@ export const api = {
       body: JSON.stringify(data)
     }, () => {
       const isTrial = data.packageType === 'TRIAL_3_DAYS';
-      const price = isTrial ? 0 : data.packageType === 'MONTHLY' ? 79000 : 790000;
+      const pricing = this.getPosPricingConfig();
+      const price = isTrial ? 0 : data.packageType === 'MONTHLY' ? pricing.monthlyPrice : pricing.annualPrice;
+      const trialDays = pricing.trialDays || 3;
       
       const newSub = {
         id: `pos-sub-${Date.now()}`,
@@ -1459,11 +1462,11 @@ export const api = {
         paymentProofUrl: data.paymentProofUrl,
         paymentProofName: data.paymentProofName,
         startDate: isTrial ? new Date().toISOString() : undefined,
-        endDate: isTrial ? new Date(Date.now() + 3 * 86400000).toISOString() : undefined,
+        endDate: isTrial ? new Date(Date.now() + trialDays * 86400000).toISOString() : undefined,
         requestedAt: new Date().toISOString(),
         reviewedAt: isTrial ? new Date().toISOString() : undefined,
-        reviewedBy: isTrial ? 'Sistem Otomatis (Instant 3-Day Trial)' : undefined,
-        adminNotes: isTrial ? 'Uji Coba 3 Hari Aktif Otomatis' : 'Menunggu verifikasi pembayaran oleh Owner/Admin'
+        reviewedBy: isTrial ? `Sistem Otomatis (Instant ${trialDays}-Day Trial)` : undefined,
+        adminNotes: isTrial ? `Uji Coba ${trialDays} Hari Aktif Otomatis` : 'Menunggu verifikasi pembayaran oleh Owner/Admin'
       };
 
       if (isCurrentDemoMode()) {
@@ -1479,7 +1482,7 @@ export const api = {
       return {
         success: true,
         message: isTrial 
-          ? 'Masa Percobaan 3 Hari berhasil diaktifkan! Fitur kasir POS kini dapat digunakan.' 
+          ? `Masa Percobaan ${trialDays} Hari berhasil diaktifkan! Fitur kasir POS kini dapat digunakan.` 
           : 'Permohonan langganan berhasil dikirim! Menunggu persetujuan Owner/Admin.',
         data: newSub
       };
@@ -1539,6 +1542,23 @@ export const api = {
         data: found || null
       };
     });
+  },
+
+  getPosPricingConfig(): PosPricingConfig {
+    try {
+      const raw = localStorage.getItem('azgo_pos_pricing_config');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return DEFAULT_POS_PRICING;
+  },
+
+  updatePosPricingConfig(config: PosPricingConfig): { success: boolean; message: string; data: PosPricingConfig } {
+    localStorage.setItem('azgo_pos_pricing_config', JSON.stringify(config));
+    return {
+      success: true,
+      message: 'Pengaturan tarif paket POS berhasil disimpan!',
+      data: config
+    };
   },
 
   // 12. Manajemen Voucher & Promo

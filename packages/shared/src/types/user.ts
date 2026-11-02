@@ -3,6 +3,18 @@ export type UserRole = 'CUSTOMER' | 'DRIVER' | 'MERCHANT' | 'HUB_STAFF' | 'ADMIN
 export type PosPackageType = 'TRIAL_3_DAYS' | 'MONTHLY' | 'ANNUAL';
 export type PosSubscriptionStatus = 'ACTIVE' | 'TRIAL' | 'PENDING_APPROVAL' | 'EXPIRED' | 'REJECTED' | 'NONE';
 
+export interface PosPricingConfig {
+  monthlyPrice: number;
+  annualPrice: number;
+  trialDays: number;
+}
+
+export const DEFAULT_POS_PRICING: PosPricingConfig = {
+  monthlyPrice: 79000,
+  annualPrice: 790000,
+  trialDays: 3,
+};
+
 export interface PosSubscriptionInfo {
   packageType: PosPackageType;
   status: PosSubscriptionStatus;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, WalletTransaction, PosSubscriptionApplication, PosPackageType } from '@delivery/shared';
+import { User, WalletTransaction, PosSubscriptionApplication, PosPackageType, PosPricingConfig } from '@delivery/shared';
 import { api } from '../../services/apiClient';
 import { 
   Store, 
@@ -65,6 +65,7 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
   const [selectedStoreType] = useState<'FOOD' | 'MART'>(accountStoreType);
 
   // POS Bundling & Subscription States
+  const [posPricing] = useState<PosPricingConfig>(() => api.getPosPricingConfig());
   const [posSub, setPosSub] = useState<PosSubscriptionApplication | null>(null);
   const [selectedPosPkg, setSelectedPosPkg] = useState<PosPackageType>('TRIAL_3_DAYS');
   const [posPaymentMethod, setPosPaymentMethod] = useState<'TRANSFER_BANK' | 'QRIS'>('TRANSFER_BANK');
@@ -1444,7 +1445,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                     <span>⏳ Permohonan Paket Bundling POS Sedang Diverifikasi Owner/Admin</span>
                   </div>
                   <p className="text-xs text-amber-800 leading-relaxed">
-                    Anda telah mengajukan <strong>{posSub.packageType === 'MONTHLY' ? 'Paket Bulanan (Rp 79.000)' : 'Paket Tahunan (Rp 790.000)'}</strong> pada {new Date(posSub.requestedAt).toLocaleDateString('id-ID')}.
+                    Anda telah mengajukan <strong>{posSub.packageType === 'MONTHLY' ? `Paket Bulanan (Rp ${posPricing.monthlyPrice.toLocaleString('id-ID')})` : `Paket Tahunan (Rp ${posPricing.annualPrice.toLocaleString('id-ID')})`}</strong> pada {new Date(posSub.requestedAt).toLocaleDateString('id-ID')}.
                     Owner / Administrator AZ GO sedang memvalidasi mutasi bukti pembayaran Anda. Begitu disetujui, modul POS Kasir akan otomatis aktif dan dapat langsung digunakan.
                   </p>
                   <div className="text-[11px] text-amber-700 font-medium">
@@ -1479,13 +1480,13 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                       </div>
 
                       <div>
-                        <h4 className="font-black text-slate-900 text-lg">Masa Percobaan 3 Hari</h4>
+                        <h4 className="font-black text-slate-900 text-lg">Masa Percobaan {posPricing.trialDays} Hari</h4>
                         <p className="text-xs text-slate-500">Coba semua fitur kasir & laporan tanpa risiko</p>
                       </div>
 
                       <div className="py-2 border-y border-slate-100">
                         <span className="text-3xl font-black text-slate-900">GRATIS</span>
-                        <span className="text-xs text-slate-400 block mt-0.5">Masa aktif 3 hari penuh</span>
+                        <span className="text-xs text-slate-400 block mt-0.5">Masa aktif {posPricing.trialDays} hari penuh</span>
                       </div>
 
                       <ul className="space-y-2 text-xs text-slate-600">
@@ -1515,7 +1516,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                       className="mt-6 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                     >
                       <Sparkles className="w-4 h-4" />
-                      <span>{posSubmitLoading ? 'Mengaktifkan...' : 'Mulai Coba Gratis 3 Hari'}</span>
+                      <span>{posSubmitLoading ? 'Mengaktifkan...' : `Mulai Coba Gratis ${posPricing.trialDays} Hari`}</span>
                     </button>
                   </div>
 
@@ -1539,7 +1540,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
 
                       <div className="py-2 border-y border-slate-100">
                         <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-black text-slate-900">Rp 79.000</span>
+                          <span className="text-3xl font-black text-slate-900">Rp {posPricing.monthlyPrice.toLocaleString('id-ID')}</span>
                           <span className="text-xs text-slate-400 font-semibold">/ bulan</span>
                         </div>
                         <span className="text-[11px] text-slate-400 block mt-0.5">Masa aktif 30 hari</span>
@@ -1585,7 +1586,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                       : 'border-amber-300 bg-white hover:border-amber-400'
                   }`}>
                     <div className="absolute -top-3 right-6 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full shadow-md">
-                      🔥 Hemat 2 Bulan (Rp 158.000)
+                      🔥 Hemat Rp {(posPricing.monthlyPrice * 12 - posPricing.annualPrice).toLocaleString('id-ID')}
                     </div>
 
                     <div className="space-y-4">
@@ -1602,11 +1603,11 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
 
                       <div className="py-2 border-y border-slate-100">
                         <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-black text-slate-900">Rp 790.000</span>
+                          <span className="text-3xl font-black text-slate-900">Rp {posPricing.annualPrice.toLocaleString('id-ID')}</span>
                           <span className="text-xs text-slate-400 font-semibold">/ tahun</span>
                         </div>
                         <span className="text-[11px] text-emerald-600 font-bold block mt-0.5">
-                          Setara Rp 65.800 / bulan (Masa aktif 365 hari)
+                          Setara Rp {Math.round(posPricing.annualPrice / 12).toLocaleString('id-ID')} / bulan (Masa aktif 365 hari)
                         </span>
                       </div>
 
@@ -1651,14 +1652,14 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>
                       <h4 className="font-extrabold text-slate-900 text-base">
-                        Pembayaran & Konfirmasi Aktivasi: {selectedPosPkg === 'MONTHLY' ? 'Paket Bulanan (Rp 79.000)' : 'Paket Tahunan (Rp 790.000)'}
+                        Pembayaran & Konfirmasi Aktivasi: {selectedPosPkg === 'MONTHLY' ? `Paket Bulanan (Rp ${posPricing.monthlyPrice.toLocaleString('id-ID')})` : `Paket Tahunan (Rp ${posPricing.annualPrice.toLocaleString('id-ID')})`}
                       </h4>
                       <p className="text-xs text-slate-500">
                         Lakukan pembayaran sesuai nominal paket, lalu unggah bukti transfer untuk disetujui Owner / Admin.
                       </p>
                     </div>
                     <span className="text-xl font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
-                      Rp {selectedPosPkg === 'MONTHLY' ? '79.000' : '790.000'}
+                      Rp {selectedPosPkg === 'MONTHLY' ? posPricing.monthlyPrice.toLocaleString('id-ID') : posPricing.annualPrice.toLocaleString('id-ID')}
                     </span>
                   </div>
 
@@ -3038,7 +3039,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                   <h5 className="font-extrabold text-slate-900">Paket Bulanan (30 Hari)</h5>
                   <p className="text-[11px] text-slate-500">Fleksibel bayar bulanan</p>
                 </div>
-                <span className="font-black text-slate-900 text-sm">Rp 79.000</span>
+                <span className="font-black text-slate-900 text-sm">Rp {posPricing.monthlyPrice.toLocaleString('id-ID')}</span>
               </label>
 
               <label
@@ -3051,12 +3052,12 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                   <div className="flex items-center gap-1.5">
                     <h5 className="font-extrabold text-slate-900">Paket Tahunan (365 Hari)</h5>
                     <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-200 text-amber-900">
-                      HEMAT 2 BLN
+                      HEMAT Rp {(posPricing.monthlyPrice * 12 - posPricing.annualPrice).toLocaleString('id-ID')}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500">Setara Rp 65.800 / bulan</p>
+                  <p className="text-[11px] text-slate-500">Setara Rp {Math.round(posPricing.annualPrice / 12).toLocaleString('id-ID')} / bulan</p>
                 </div>
-                <span className="font-black text-slate-900 text-sm">Rp 790.000</span>
+                <span className="font-black text-slate-900 text-sm">Rp {posPricing.annualPrice.toLocaleString('id-ID')}</span>
               </label>
             </div>
 

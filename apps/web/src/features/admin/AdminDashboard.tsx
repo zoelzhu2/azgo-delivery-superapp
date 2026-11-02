@@ -14,7 +14,9 @@ import {
   Voucher,
   VoucherDiscountType,
   VoucherServiceScope,
-  CreateVoucherInput
+  CreateVoucherInput,
+  PosPricingConfig,
+  DEFAULT_POS_PRICING
 } from '@delivery/shared';
 import { 
   Sliders, 
@@ -116,6 +118,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [posAdminNotes, setPosAdminNotes] = useState('');
   const [posProofPreviewModal, setPosProofPreviewModal] = useState<string | null>(null);
   const [posActionSuccess, setPosActionSuccess] = useState('');
+
+  // POS Pricing Configuration State
+  const [posMonthlyPriceInput, setPosMonthlyPriceInput] = useState<number>(() => api.getPosPricingConfig().monthlyPrice);
+  const [posAnnualPriceInput, setPosAnnualPriceInput] = useState<number>(() => api.getPosPricingConfig().annualPrice);
+  const [posTrialDaysInput, setPosTrialDaysInput] = useState<number>(() => api.getPosPricingConfig().trialDays);
+  const [posPricingSuccess, setPosPricingSuccess] = useState<string>('');
 
   // QRIS Payment Settings State
   const [qrisMerchantName, setQrisMerchantName] = useState('AZ GO INDONESIA');
@@ -478,6 +486,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } catch (err: any) {
       alert(err.message || 'Terjadi kesalahan sistem');
     }
+  };
+
+  const handleSavePosPricing = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newConfig: PosPricingConfig = {
+      monthlyPrice: Number(posMonthlyPriceInput) || 79000,
+      annualPrice: Number(posAnnualPriceInput) || 790000,
+      trialDays: Number(posTrialDaysInput) || 3
+    };
+    api.updatePosPricingConfig(newConfig);
+    setPosPricingSuccess('✅ Tarif paket POS berhasil diperbarui! Harga baru langsung aktif pada form pendaftaran mitra dan portal toko.');
+    setTimeout(() => setPosPricingSuccess(''), 6000);
+  };
+
+  const handleResetPosPricing = () => {
+    api.updatePosPricingConfig(DEFAULT_POS_PRICING);
+    setPosMonthlyPriceInput(DEFAULT_POS_PRICING.monthlyPrice);
+    setPosAnnualPriceInput(DEFAULT_POS_PRICING.annualPrice);
+    setPosTrialDaysInput(DEFAULT_POS_PRICING.trialDays);
+    setPosPricingSuccess('✅ Tarif paket POS dikembalikan ke harga standar bawaan (Rp 79rb/bln, Rp 790rb/thn, Trial 3 Hari).');
+    setTimeout(() => setPosPricingSuccess(''), 6000);
   };
 
   // Admin User Creation
@@ -2517,6 +2546,127 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Total akumulasi paket aktif
               </span>
             </div>
+          </div>
+
+          {/* Form Pengaturan Tarif Paket POS Kasir */}
+          <div className="bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/50 rounded-3xl border border-indigo-200/80 shadow-sm p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 bg-indigo-600 text-white rounded-xl shadow-sm">
+                    <Sliders className="w-4 h-4" />
+                  </span>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    Pengaturan Tarif & Durasi Paket POS Kasir
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ubah nominal harga langganan atau masa uji coba gratis untuk seluruh mitra toko (Resto & Mart).
+                </p>
+              </div>
+
+              <span className="text-[11px] font-bold text-indigo-700 bg-indigo-100/70 px-3 py-1 rounded-full border border-indigo-200 self-start sm:self-auto">
+                Live Pricing AZ GO
+              </span>
+            </div>
+
+            {posPricingSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-2xl text-xs font-bold text-emerald-900 flex items-center gap-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{posPricingSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSavePosPricing} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Tarif Bulanan */}
+                <div className="p-4 bg-white rounded-2xl border border-indigo-100 shadow-sm space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Tarif Paket Bulanan (Rp) <span className="text-rose-500">*</span>
+                  </label>
+                  <p className="text-[10px] text-slate-400">Harga bayar per bulan (masa aktif 30 hari)</p>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step={1000}
+                      value={posMonthlyPriceInput}
+                      onChange={e => setPosMonthlyPriceInput(Number(e.target.value))}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-indigo-500"
+                    />
+                  </div>
+                  <span className="text-[10px] text-indigo-700 font-semibold block pt-1">
+                    Saat ini: Rp {posMonthlyPriceInput.toLocaleString('id-ID')} / bulan
+                  </span>
+                </div>
+
+                {/* Tarif Tahunan */}
+                <div className="p-4 bg-white rounded-2xl border border-indigo-100 shadow-sm space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Tarif Paket Tahunan (Rp) <span className="text-rose-500">*</span>
+                  </label>
+                  <p className="text-[10px] text-slate-400">Harga bayar per tahun (masa aktif 365 hari)</p>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step={1000}
+                      value={posAnnualPriceInput}
+                      onChange={e => setPosAnnualPriceInput(Number(e.target.value))}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-indigo-500"
+                    />
+                  </div>
+                  <span className="text-[10px] text-emerald-700 font-semibold block pt-1">
+                    Hemat Rp {((posMonthlyPriceInput * 12) - posAnnualPriceInput).toLocaleString('id-ID')} vs Bulanan
+                  </span>
+                </div>
+
+                {/* Masa Uji Coba (Hari) */}
+                <div className="p-4 bg-white rounded-2xl border border-indigo-100 shadow-sm space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Durasi Masa Uji Coba Trial (Hari) <span className="text-rose-500">*</span>
+                  </label>
+                  <p className="text-[10px] text-slate-400">Durasi gratis mencoba bagi mitra baru</p>
+                  <div className="relative mt-1">
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={90}
+                      value={posTrialDaysInput}
+                      onChange={e => setPosTrialDaysInput(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-indigo-500"
+                    />
+                    <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">Hari</span>
+                  </div>
+                  <span className="text-[10px] text-amber-700 font-semibold block pt-1">
+                    Uji coba gratis selama {posTrialDaysInput} hari tanpa bayar
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetPosPricing}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                >
+                  Kembalikan ke Default Bawaan
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Perubahan Tarif POS</span>
+                </button>
+              </div>
+            </form>
           </div>
 
           {/* Filter Bar & Applications List */}

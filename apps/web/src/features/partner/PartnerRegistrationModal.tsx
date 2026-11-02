@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../../services/apiClient';
-import { PartnerType, DriverVehicleCategory, MerchantCategoryType, PosPackageType } from '@delivery/shared';
+import { PartnerType, DriverVehicleCategory, MerchantCategoryType, PosPackageType, PosPricingConfig } from '@delivery/shared';
 import { 
   X, 
   Bike, 
@@ -92,6 +92,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
   const [selfCourierPlate, setSelfCourierPlate] = useState('');
 
   // Opsi Bundling POS Kasir & Laporan Keuangan
+  const [posPricing] = useState<PosPricingConfig>(() => api.getPosPricingConfig());
   const [posPackageChoice, setPosPackageChoice] = useState<'NONE' | PosPackageType>('TRIAL_3_DAYS');
   const [posPaymentMethod, setPosPaymentMethod] = useState<'TRANSFER_BANK' | 'QRIS' | 'FREE_TRIAL'>('FREE_TRIAL');
   const [posPaymentProofPreview, setPosPaymentProofPreview] = useState<string | null>(null);
@@ -132,6 +133,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
   };
 
   const handleUseSamplePosProof = () => {
+    const sampleAmount = posPackageChoice === 'ANNUAL' ? posPricing.annualPrice : posPricing.monthlyPrice;
     const sampleSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500">
   <rect width="400" height="500" fill="#f8fafc" rx="16"/>
   <rect x="16" y="16" width="368" height="468" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
@@ -141,7 +143,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
   <text x="200" y="148" font-family="sans-serif" font-size="11" font-weight="600" fill="#64748b" text-anchor="middle">BCA • TRF-POS-${Math.floor(100000 + Math.random() * 900000)}</text>
   <line x1="36" y1="170" x2="364" y2="170" stroke="#e2e8f0" stroke-dasharray="6 6"/>
   <text x="44" y="210" font-family="sans-serif" font-size="12" fill="#64748b">Nominal Transfer</text>
-  <text x="356" y="210" font-family="sans-serif" font-size="16" font-weight="800" fill="#059669" text-anchor="end">Rp ${posPackageChoice === 'ANNUAL' ? '790.000' : '79.000'}</text>
+  <text x="356" y="210" font-family="sans-serif" font-size="16" font-weight="800" fill="#059669" text-anchor="end">Rp ${sampleAmount.toLocaleString('id-ID')}</text>
   <text x="44" y="250" font-family="sans-serif" font-size="12" fill="#64748b">Paket Langganan</text>
   <text x="356" y="250" font-family="sans-serif" font-size="12" font-weight="700" fill="#0f172a" text-anchor="end">${posPackageChoice === 'ANNUAL' ? 'POS Tahunan (12 Bulan)' : 'POS Bulanan (1 Bulan)'}</text>
   <text x="44" y="290" font-family="sans-serif" font-size="12" fill="#64748b">Rekening Tujuan</text>
@@ -878,11 +880,11 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                       >
                         <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
                           <Sparkles className="w-2.5 h-2.5" />
-                          COBA GRATIS 3 HARI
+                          COBA GRATIS {posPricing.trialDays} HARI
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-amber-900">Bundling POS — Trial 3 Hari</span>
+                            <span className="text-xs font-bold text-amber-900">Bundling POS — Trial {posPricing.trialDays} Hari</span>
                             {posPackageChoice === 'TRIAL_3_DAYS' && (
                               <span className="p-0.5 bg-amber-600 text-white rounded-full">
                                 <Check className="w-3 h-3" />
@@ -892,7 +894,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                           <p className="text-[11px] text-slate-600 font-medium">Coba seluruh fitur POS Kasir tanpa bayar sekarang</p>
                           <div className="pt-2">
                             <span className="text-base font-black text-amber-900">Gratis (Rp 0)</span>
-                            <span className="text-[10px] text-amber-700 font-semibold block">Masa percobaan 3 hari penuh</span>
+                            <span className="text-[10px] text-amber-700 font-semibold block">Masa percobaan {posPricing.trialDays} hari penuh</span>
                           </div>
                         </div>
                         <div className="mt-3 pt-2 border-t border-amber-200/50 flex items-center gap-1.5 text-[10px] text-amber-800">
@@ -922,7 +924,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                           </div>
                           <p className="text-[11px] text-slate-600 font-medium">Langganan fleksibel bayar bulanan</p>
                           <div className="pt-2">
-                            <span className="text-base font-black text-indigo-950">Rp 79.000</span>
+                            <span className="text-base font-black text-indigo-950">Rp {posPricing.monthlyPrice.toLocaleString('id-ID')}</span>
                             <span className="text-[10px] text-slate-500 inline ml-1">/ bulan</span>
                             <span className="text-[10px] text-indigo-700 font-semibold block">Perpanjang bulanan fleksibel</span>
                           </div>
@@ -944,7 +946,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                         }`}
                       >
                         <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
-                          HEMAT 2 BULAN (Rp 158.000)
+                          HEMAT Rp {(posPricing.monthlyPrice * 12 - posPricing.annualPrice).toLocaleString('id-ID')}
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center justify-between">
@@ -957,9 +959,9 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                           </div>
                           <p className="text-[11px] text-slate-600 font-medium">Paket paling hemat untuk operasional setahun</p>
                           <div className="pt-2">
-                            <span className="text-base font-black text-emerald-950">Rp 790.000</span>
+                            <span className="text-base font-black text-emerald-950">Rp {posPricing.annualPrice.toLocaleString('id-ID')}</span>
                             <span className="text-[10px] text-slate-500 inline ml-1">/ tahun</span>
-                            <span className="text-[10px] text-emerald-700 font-semibold block">Setara Rp 65.800 / bulan</span>
+                            <span className="text-[10px] text-emerald-700 font-semibold block">Setara Rp {Math.round(posPricing.annualPrice / 12).toLocaleString('id-ID')} / bulan</span>
                           </div>
                         </div>
                         <div className="mt-3 pt-2 border-t border-emerald-200/50 flex items-center gap-1.5 text-[10px] text-emerald-800">
@@ -975,7 +977,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                           <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                             <Receipt className="w-3.5 h-3.5 text-indigo-600" />
-                            Instruksi Pembayaran Paket {posPackageChoice === 'ANNUAL' ? 'Tahunan (Rp 790.000)' : 'Bulanan (Rp 79.000)'}
+                            Instruksi Pembayaran Paket {posPackageChoice === 'ANNUAL' ? `Tahunan (Rp ${posPricing.annualPrice.toLocaleString('id-ID')})` : `Bulanan (Rp ${posPricing.monthlyPrice.toLocaleString('id-ID')})`}
                           </span>
                           <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                             Wajib Upload Bukti
@@ -1023,7 +1025,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                               <div className="mt-1 p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
                                 <span className="text-[11px] text-slate-600 block">Total Tagihan:</span>
                                 <span className="text-sm font-black text-indigo-700">
-                                  {posPackageChoice === 'ANNUAL' ? 'Rp 790.000' : 'Rp 79.000'}
+                                  {posPackageChoice === 'ANNUAL' ? `Rp ${posPricing.annualPrice.toLocaleString('id-ID')}` : `Rp ${posPricing.monthlyPrice.toLocaleString('id-ID')}`}
                                 </span>
                               </div>
                             </div>
@@ -1039,7 +1041,7 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                               <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-1 rounded">BCA</span>
                             </div>
                             <p className="text-[11px] text-slate-500">
-                              Nominal: <strong className="text-indigo-700">{posPackageChoice === 'ANNUAL' ? 'Rp 790.000' : 'Rp 79.000'}</strong>
+                              Nominal: <strong className="text-indigo-700">{posPackageChoice === 'ANNUAL' ? `Rp ${posPricing.annualPrice.toLocaleString('id-ID')}` : `Rp ${posPricing.monthlyPrice.toLocaleString('id-ID')}`}</strong>
                             </p>
                           </div>
                         )}
