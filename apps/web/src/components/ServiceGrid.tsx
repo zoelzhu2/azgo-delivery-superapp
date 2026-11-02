@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Bike, 
+  Car,
   Package, 
   Zap, 
   Truck, 
@@ -46,6 +47,28 @@ export const ServiceGrid: React.FC<ServiceGridProps> = ({
     return found.isActive !== false && found.isEnabled !== false;
   };
   const allServices = [
+    {
+      id: 'ride',
+      name: 'Az Ride',
+      subtitle: 'Ojek motor online penumpang',
+      desc: 'Antar jemput penumpang motor cepat, hemat, gesit & bebas macet.',
+      icon: Bike,
+      iconColor: 'text-rose-600',
+      bgColor: 'bg-rose-50',
+      borderColor: 'border-rose-200',
+      badge: '1 Penumpang'
+    },
+    {
+      id: 'car',
+      name: 'Az Car',
+      subtitle: 'Taksi mobil online penumpang',
+      desc: 'Antar jemput mobil ber-AC nyaman, aman cuaca, kapasitas 4–6 kursi.',
+      icon: Car,
+      iconColor: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      badge: '4-6 Kursi'
+    },
     {
       id: 'delivery',
       name: 'Az Delivery',

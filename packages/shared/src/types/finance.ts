@@ -25,6 +25,10 @@ export interface WalletTransaction {
   createdAt: string;
 }
 
+export type DisbursementMode = 'SCHEDULED' | 'INSTANT_ON_DEMAND';
+
+export type WithdrawalStatus = 'PENDING' | 'APPROVED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED' | 'FAILED';
+
 export interface WithdrawalRequest {
   id: string;
   partnerId: string;
@@ -34,10 +38,28 @@ export interface WithdrawalRequest {
   bankName: string;
   accountNumber: string;
   accountHolder: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: WithdrawalStatus;
+  mode?: DisbursementMode;
+  transferFee?: number;
+  netDisbursedAmount?: number;
+  referenceId?: string; // ID transaksi API Payout (Midtrans Iris / Xendit)
   requestedAt: string;
   processedAt?: string;
   rejectionReason?: string;
+}
+
+export interface CodDepositRecord {
+  id: string;
+  driverId: string;
+  driverName: string;
+  amount: number;
+  depositMethod: 'CASH_AT_HUB' | 'VIRTUAL_ACCOUNT' | 'QRIS';
+  proofUrl?: string;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  hubId?: string;
+  verifiedBy?: string;
+  createdAt: string;
+  verifiedAt?: string;
 }
 
 export interface PlatformFinanceSummary {

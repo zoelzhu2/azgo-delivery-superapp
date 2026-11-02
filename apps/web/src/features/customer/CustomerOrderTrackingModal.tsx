@@ -8,6 +8,7 @@ import {
   Star, 
   CheckCircle2, 
   Bike, 
+  Car,
   UtensilsCrossed, 
   Store, 
   ChevronRight,
@@ -26,7 +27,7 @@ export interface CustomerOrderItem {
 
 export interface CustomerOrder {
   orderNumber: string;
-  serviceType: 'FOOD' | 'MART' | 'LOCAL_GOODS' | 'COURIER' | 'CARGO' | 'PICKUP' | 'EXPEDITION';
+  serviceType: 'FOOD' | 'MART' | 'LOCAL_GOODS' | 'COURIER' | 'CARGO' | 'PICKUP' | 'EXPEDITION' | 'RIDE';
   serviceName: string;
   merchantName?: string;
   pickupAddress: string;
@@ -91,6 +92,7 @@ export const CustomerOrderTrackingModal: React.FC<CustomerOrderTrackingModalProp
 
   // Convert status to stepper stages
   const isFoodOrMart = order.serviceType === 'FOOD' || order.serviceType === 'MART';
+  const isRide = order.serviceType === 'RIDE';
 
   const steps = isFoodOrMart ? [
     { key: 'ACCEPTED', label: 'Pesanan Diterima', desc: 'Resto/Toko telah menerima pesanan' },
@@ -98,6 +100,11 @@ export const CustomerOrderTrackingModal: React.FC<CustomerOrderTrackingModalProp
     { key: 'PICKING_UP', label: 'Kurir Menjemput', desc: 'Driver menuju toko mengambil pesanan' },
     { key: 'IN_TRANSIT', label: 'Sedang Diantar', desc: 'Driver dalam perjalanan ke alamat Anda' },
     { key: 'COMPLETED', label: 'Tiba di Tujuan', desc: 'Pesanan telah diterima pelanggan' }
+  ] : isRide ? [
+    { key: 'ACCEPTED', label: 'Driver Dikonfirmasi', desc: 'Pengemudi menerima perjalanan Anda' },
+    { key: 'PICKING_UP', label: 'Menuju Titik Jemput', desc: 'Pengemudi dalam perjalanan ke lokasi Anda' },
+    { key: 'IN_TRANSIT', label: 'Dalam Perjalanan', desc: 'Sedang melaju menuju alamat tujuan' },
+    { key: 'COMPLETED', label: 'Tiba di Tujuan', desc: 'Perjalanan penumpang selesai dengan selamat' }
   ] : [
     { key: 'ACCEPTED', label: 'Permintaan Diterima', desc: 'Sistem mengalokasikan armada terdekat' },
     { key: 'PICKING_UP', label: 'Kurir Menjemput', desc: 'Kurir motor/truk menuju lokasi jemput' },
@@ -156,6 +163,7 @@ export const CustomerOrderTrackingModal: React.FC<CustomerOrderTrackingModalProp
             <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md">
               {order.serviceType === 'FOOD' ? <UtensilsCrossed className="w-5 h-5" /> : 
                order.serviceType === 'MART' ? <Store className="w-5 h-5" /> : 
+               order.serviceType === 'RIDE' ? (order.driverInfo?.vehicleType === 'CAR' ? <Car className="w-5 h-5" /> : <Bike className="w-5 h-5" />) :
                <Bike className="w-5 h-5" />}
             </div>
             <div>

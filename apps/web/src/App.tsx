@@ -8,6 +8,7 @@ import { ExpeditionHub } from './features/expedition/ExpeditionHub';
 import { CargoBooking } from './features/cargo/CargoBooking';
 import { MartShopping } from './features/mart/MartShopping';
 import { PickupRequest } from './features/pickup/PickupRequest';
+import { RideBooking } from './features/ride/RideBooking';
 import { AdminDashboard } from './features/admin/AdminDashboard';
 import { DriverPortal } from './features/driver/DriverPortal';
 import { MerchantPortal } from './features/merchant/MerchantPortal';
@@ -59,6 +60,7 @@ export const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<string>('home');
+  const [rideInitialVehicle, setRideInitialVehicle] = useState<'MOTORBIKE' | 'CAR'>('MOTORBIKE');
   const [trackedAwb, setTrackedAwb] = useState<string>('');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -275,12 +277,23 @@ export const App: React.FC = () => {
 
   // RBAC Navigation Guard & Service Availability Check
   const handleSelectTab = (targetTab: string) => {
-    const serviceKeys = ['delivery', 'courier', 'express', 'cargo', 'mart', 'pickup', 'tracking'];
+    const serviceKeys = ['ride', 'car', 'delivery', 'courier', 'express', 'cargo', 'mart', 'pickup', 'tracking'];
     if (serviceKeys.includes(targetTab)) {
       if (!isServiceActive(targetTab)) {
         alert('Mohon maaf, layanan ini sedang dinonaktifkan sementara oleh Administrator AZ GO untuk pemeliharaan sistem.');
         return;
       }
+    }
+
+    if (targetTab === 'ride') {
+      setRideInitialVehicle('MOTORBIKE');
+      setActiveTab('ride');
+      return;
+    }
+    if (targetTab === 'car') {
+      setRideInitialVehicle('CAR');
+      setActiveTab('ride');
+      return;
     }
 
     if (targetTab === 'tracking') {
@@ -408,6 +421,18 @@ export const App: React.FC = () => {
               setPartnerModalType(type);
               setShowPartnerModal(true);
             }}
+          />
+        )}
+
+        {/* 🛵 & 🚗 Az Ride & Car (Ojek & Taksi Online Penumpang) */}
+        {activeTab === 'ride' && (
+          <RideBooking
+            onBack={() => setActiveTab('home')}
+            currentUser={currentUser}
+            initialVehicleType={rideInitialVehicle}
+            onRequestLogin={handleRequestLogin}
+            onOrderCreated={handleOrderCreated}
+            onTrackOrder={handleTrackOrder}
           />
         )}
 

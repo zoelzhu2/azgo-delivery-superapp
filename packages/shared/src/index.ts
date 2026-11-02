@@ -4,3 +4,4 @@ export * from './types/expedition';
 export * from './types/pricing';
 export * from './types/partner';
 export * from './types/finance';
+export * from './types/payment';

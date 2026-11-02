@@ -7,6 +7,7 @@ import adminRoutes from './modules/admin/admin.routes';
 import authRoutes from './modules/auth/auth.routes';
 import partnerRoutes from './modules/partner/partner.routes';
 import financeRoutes from './modules/finance/finance.routes';
+import paymentRoutes from './modules/payment/payment.routes';
 
 export const createApp = () => {
   const app = express();
@@ -33,6 +34,7 @@ export const createApp = () => {
   app.use('/api/admin', adminRoutes);
   app.use('/api/partner', partnerRoutes);
   app.use('/api/finance', financeRoutes);
+  app.use('/api/payment', paymentRoutes);
 
   // Global Error Handler Terpusat
   app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
