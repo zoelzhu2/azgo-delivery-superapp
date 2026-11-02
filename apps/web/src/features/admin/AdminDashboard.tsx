@@ -1778,6 +1778,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     🛵 Driver AzGo Saja
                                   </span>
                                 )}
+
+                                <div className="mt-1">
+                                  {app.posPackageType === 'TRIAL_3_DAYS' ? (
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 text-[9px] font-extrabold border border-amber-300">
+                                      ⭐ POS: Trial 3 Hari
+                                    </span>
+                                  ) : app.posPackageType === 'MONTHLY' ? (
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 text-[9px] font-extrabold border border-indigo-300">
+                                      💳 POS: Bulanan (Rp 79rb)
+                                    </span>
+                                  ) : app.posPackageType === 'ANNUAL' ? (
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[9px] font-extrabold border border-emerald-300">
+                                      🚀 POS: Tahunan (Rp 790rb)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-slate-50 text-slate-500 text-[9px] font-medium border border-slate-200">
+                                      Reguler (Tanpa POS)
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </td>
@@ -3674,6 +3694,99 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </>
               )}
             </div>
+
+            {/* Informasi Paket Bundling POS Kasir & Bukti Pembayaran */}
+            {selectedApp.type === 'MERCHANT' && (
+              <div className="p-4 bg-gradient-to-br from-indigo-50/80 via-purple-50/50 to-amber-50/50 rounded-2xl border border-indigo-200 text-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 bg-indigo-600 text-white rounded-lg">
+                      <Receipt className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="font-extrabold text-indigo-950 text-xs uppercase tracking-wider">
+                      Paket Bundling POS Kasir & Laporan Keuangan
+                    </span>
+                  </div>
+                  {selectedApp.posPackageType === 'TRIAL_3_DAYS' && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                      ⭐ Trial 3 Hari (Gratis)
+                    </span>
+                  )}
+                  {selectedApp.posPackageType === 'MONTHLY' && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-900 border border-indigo-300">
+                      💳 Bulanan (Rp 79.000 / bln)
+                    </span>
+                  )}
+                  {selectedApp.posPackageType === 'ANNUAL' && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                      🚀 Tahunan (Rp 790.000 / thn)
+                    </span>
+                  )}
+                  {(!selectedApp.posPackageType || selectedApp.posPackageType === 'NONE') && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-300">
+                      Paket Reguler (Tanpa POS Kasir)
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-700">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Permintaan Layanan POS:</span>
+                    <span className="font-bold text-slate-900">
+                      {selectedApp.posSubscriptionRequested 
+                        ? 'Ya, Bundling Kasir Digital & Lap. Keuangan' 
+                        : 'Tidak (Hanya Online Az Delivery / Mart)'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Metode Pembayaran:</span>
+                    <span className="font-bold text-slate-900">
+                      {selectedApp.posPaymentMethod === 'QRIS' 
+                        ? 'QRIS Instan AZ GO' 
+                        : selectedApp.posPaymentMethod === 'TRANSFER_BANK'
+                        ? 'Transfer Bank BCA'
+                        : selectedApp.posPackageType === 'TRIAL_3_DAYS'
+                        ? 'Gratis Uji Coba 3 Hari (Tanpa Bayar)'
+                        : '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bukti Pembayaran Paket POS jika ada */}
+                {selectedApp.posPaymentProofUrl && (
+                  <div className="p-3 bg-white rounded-xl border border-indigo-100 space-y-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800">
+                        Bukti Transfer Pembayaran ({selectedApp.posPaymentProofName || 'Bukti Transfer'})
+                      </span>
+                      <a 
+                        href={selectedApp.posPaymentProofUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-indigo-600 hover:underline font-bold"
+                      >
+                        Lihat Gambar Penuh ↗
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <img 
+                        src={selectedApp.posPaymentProofUrl}
+                        alt="Bukti Transfer POS"
+                        className="w-20 h-20 object-contain rounded-lg border border-slate-200 bg-slate-50 p-1"
+                      />
+                      <div className="text-[11px] text-slate-600 space-y-1">
+                        <p className="font-semibold text-slate-800">
+                          Paket: {selectedApp.posPackageType === 'ANNUAL' ? 'Tahunan (Rp 790.000)' : 'Bulanan (Rp 79.000)'}
+                        </p>
+                        <p className="text-emerald-700 font-bold">
+                          ✓ Bukti transfer telah dilampirkan. Saat Anda menyetujui kemitraan ini, sistem akan otomatis mengaktifkan paket POS kasir toko ini.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Lampiran Dokumen & Foto */}
             <div className="space-y-2">

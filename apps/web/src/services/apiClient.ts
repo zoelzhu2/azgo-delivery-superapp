@@ -1,4 +1,4 @@
-import { UserRole, Voucher, CreateVoucherInput, UpdateVoucherInput, ValidateVoucherResult } from '@delivery/shared';
+import { UserRole, Voucher, CreateVoucherInput, UpdateVoucherInput, ValidateVoucherResult, PosSubscriptionApplication } from '@delivery/shared';
 import { 
   MOCK_USERS, 
   MOCK_RESTAURANTS, 
@@ -1054,17 +1054,54 @@ export const api = {
   },
 
   async getAdminServices(): Promise<any> {
-    return safeFetch('/admin/services', undefined, () => ({
-      success: true,
-      data: MOCK_SERVICES
-    }));
+    return safeFetch('/admin/services', undefined, () => {
+      let stored = isCurrentDemoMode()
+        ? JSON.parse(localStorage.getItem('azgo_demo_services') || 'null')
+        : getRealStorage<any[]>('azgo_real_services', null as any);
+
+      let list = Array.isArray(stored) && stored.length > 0 ? [...stored] : [...MOCK_SERVICES];
+      for (const def of MOCK_SERVICES) {
+        if (!list.some(s => s.id === def.id)) {
+          list.push(def);
+        }
+      }
+      if (isCurrentDemoMode()) {
+        localStorage.setItem('azgo_demo_services', JSON.stringify(list));
+      } else {
+        setRealStorage('azgo_real_services', list);
+      }
+      return {
+        success: true,
+        data: list
+      };
+    });
   },
 
   async toggleAdminService(serviceId: string): Promise<any> {
-    return safeFetch(`/admin/services/${serviceId}/toggle`, { method: 'PATCH' }, () => ({
-      success: true,
-      message: 'Status layanan diperbarui'
-    }));
+    return safeFetch(`/admin/services/${serviceId}/toggle`, { method: 'PATCH' }, () => {
+      let stored = isCurrentDemoMode()
+        ? JSON.parse(localStorage.getItem('azgo_demo_services') || 'null')
+        : getRealStorage<any[]>('azgo_real_services', null as any);
+
+      let list = Array.isArray(stored) && stored.length > 0 ? [...stored] : [...MOCK_SERVICES];
+      for (const def of MOCK_SERVICES) {
+        if (!list.some(s => s.id === def.id)) list.push(def);
+      }
+      const item = list.find((s: any) => s.id === serviceId);
+      if (item) {
+        item.isActive = !item.isActive;
+        if (isCurrentDemoMode()) {
+          localStorage.setItem('azgo_demo_services', JSON.stringify(list));
+        } else {
+          setRealStorage('azgo_real_services', list);
+        }
+      }
+      return {
+        success: true,
+        message: `Status layanan ${item?.name || serviceId} diperbarui`,
+        data: item
+      };
+    });
   },
 
   // 10. PENDAFTARAN MITRA (DRIVER & TOKO/RESTO/MART)
@@ -1081,10 +1118,45 @@ export const api = {
         createdAt: new Date().toISOString(),
         submittedAt: new Date().toISOString()
       };
-      if (!isCurrentDemoMode()) {
+      if (isCurrentDemoMode()) {
+        MOCK_PARTNER_APPLICATIONS.unshift(newApp);
+      } else {
         const apps = getRealStorage<any[]>('azgo_real_partner_applications', []);
         setRealStorage('azgo_real_partner_applications', [newApp, ...apps]);
       }
+
+      // Jika mitra Resto/Mart memilih paket bundling POS Kasir
+      if (data.type === 'MERCHANT' && data.posSubscriptionRequested && data.posPackageType && data.posPackageType !== 'NONE') {
+        const price = data.posPackageType === 'ANNUAL' ? 790000 : data.posPackageType === 'MONTHLY' ? 79000 : 0;
+        const newPosSub: PosSubscriptionApplication = {
+          id: 'pos-app-' + Date.now(),
+          merchantId: newApp.id,
+          merchantName: data.storeName || data.fullName,
+          storeType: data.merchantType || 'FOOD',
+          phone: data.phone,
+          email: data.email,
+          packageType: data.posPackageType,
+          status: 'PENDING_APPROVAL',
+          price,
+          paymentMethod: data.posPaymentMethod || (price === 0 ? 'FREE_TRIAL' : 'TRANSFER_BANK'),
+          paymentProofUrl: data.posPaymentProofUrl,
+          paymentProofName: data.posPaymentProofName,
+          requestedAt: new Date().toISOString()
+        };
+
+        if (isCurrentDemoMode()) {
+          const list = JSON.parse(localStorage.getItem('azgo_demo_pos_subs') || 'null') || [...MOCK_POS_SUBSCRIPTIONS];
+          list.unshift(newPosSub);
+          localStorage.setItem('azgo_demo_pos_subs', JSON.stringify(list));
+          localStorage.setItem('azgo_demo_pos_subscriptions', JSON.stringify(list));
+        } else {
+          const list = getRealStorage<PosSubscriptionApplication[]>('azgo_real_pos_subs', [...MOCK_POS_SUBSCRIPTIONS]);
+          list.unshift(newPosSub);
+          setRealStorage('azgo_real_pos_subs', list);
+          setRealStorage('azgo_real_pos_subscriptions', list);
+        }
+      }
+
       return {
         success: true,
         message: 'Pendaftaran mitra berhasil dikirim! Tim AzGo akan meninjau berkas Anda dalam 1x24 jam.',
@@ -1096,9 +1168,9 @@ export const api = {
   async getPartnerApplications(status?: string, type?: string): Promise<any> {
     return safeFetch('/partner/applications', undefined, () => {
       if (isCurrentDemoMode()) {
-        let apps = MOCK_PARTNER_APPLICATIONS;
-        if (status && status !== 'ALL') apps = apps.filter(a => a.status === status);
-        if (type && type !== 'ALL') apps = apps.filter(a => a.type === type);
+        let apps = JSON.parse(localStorage.getItem('azgo_demo_partner_applications') || 'null') || MOCK_PARTNER_APPLICATIONS;
+        if (status && status !== 'ALL') apps = apps.filter((a: any) => a.status === status);
+        if (type && type !== 'ALL') apps = apps.filter((a: any) => a.type === type);
         return { success: true, data: apps };
       }
 
@@ -1115,15 +1187,79 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, reason })
     }, () => {
-      if (!isCurrentDemoMode()) {
+      let targetApp: any = null;
+      if (isCurrentDemoMode()) {
+        const apps = JSON.parse(localStorage.getItem('azgo_demo_partner_applications') || 'null') || [...MOCK_PARTNER_APPLICATIONS];
+        targetApp = apps.find((a: any) => a.id === id);
+        if (targetApp) {
+          targetApp = {
+            ...targetApp,
+            status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+            rejectReason: reason,
+            reviewedAt: new Date().toISOString()
+          };
+          const updated = apps.map((a: any) => a.id === id ? targetApp : a);
+          localStorage.setItem('azgo_demo_partner_applications', JSON.stringify(updated));
+
+          if (action === 'APPROVE' && targetApp.posSubscriptionRequested) {
+            const subs = JSON.parse(localStorage.getItem('azgo_demo_pos_subs') || 'null') || [...MOCK_POS_SUBSCRIPTIONS];
+            const updatedSubs = subs.map((s: any) => {
+              if (s.merchantId === id || s.merchantName === targetApp.storeName) {
+                const durationDays = targetApp.posPackageType === 'ANNUAL' ? 365 : targetApp.posPackageType === 'MONTHLY' ? 30 : 3;
+                return {
+                  ...s,
+                  status: targetApp.posPackageType === 'TRIAL_3_DAYS' ? 'TRIAL' : 'ACTIVE',
+                  startDate: new Date().toISOString(),
+                  endDate: new Date(Date.now() + durationDays * 86400000).toISOString(),
+                  reviewedAt: new Date().toISOString(),
+                  reviewedBy: 'Super Admin AZ GO (Auto Approve bersamaan Mitra)'
+                };
+              }
+              return s;
+            });
+            localStorage.setItem('azgo_demo_pos_subs', JSON.stringify(updatedSubs));
+            localStorage.setItem('azgo_demo_pos_subscriptions', JSON.stringify(updatedSubs));
+          }
+        }
+      } else {
         const apps = getRealStorage<any[]>('azgo_real_partner_applications', []);
-        const updated = apps.map(a => a.id === id ? { ...a, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED', rejectReason: reason } : a);
-        setRealStorage('azgo_real_partner_applications', updated);
+        targetApp = apps.find(a => a.id === id);
+        if (targetApp) {
+          targetApp = {
+            ...targetApp,
+            status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+            rejectReason: reason,
+            reviewedAt: new Date().toISOString()
+          };
+          const updated = apps.map(a => a.id === id ? targetApp : a);
+          setRealStorage('azgo_real_partner_applications', updated);
+
+          if (action === 'APPROVE' && targetApp.posSubscriptionRequested) {
+            const subs = getRealStorage<any[]>('azgo_real_pos_subs', []);
+            const updatedSubs = subs.map((s: any) => {
+              if (s.merchantId === id || s.merchantName === targetApp.storeName) {
+                const durationDays = targetApp.posPackageType === 'ANNUAL' ? 365 : targetApp.posPackageType === 'MONTHLY' ? 30 : 3;
+                return {
+                  ...s,
+                  status: targetApp.posPackageType === 'TRIAL_3_DAYS' ? 'TRIAL' : 'ACTIVE',
+                  startDate: new Date().toISOString(),
+                  endDate: new Date(Date.now() + durationDays * 86400000).toISOString(),
+                  reviewedAt: new Date().toISOString(),
+                  reviewedBy: 'Super Admin AZ GO (Auto Approve bersamaan Mitra)'
+                };
+              }
+              return s;
+            });
+            setRealStorage('azgo_real_pos_subs', updatedSubs);
+            setRealStorage('azgo_real_pos_subscriptions', updatedSubs);
+          }
+        }
       }
+
       return {
         success: true,
-        message: `Pendaftaran berhasil di-${action === 'APPROVE' ? 'setujui' : 'tolak'}`,
-        data: { id, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED' }
+        message: `Pendaftaran berhasil di-${action === 'APPROVE' ? 'setujui' : 'tolak'}${targetApp?.posSubscriptionRequested && action === 'APPROVE' ? ' dan Paket Bundling POS telah diaktifkan' : ''}`,
+        data: targetApp || { id, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED' }
       };
     });
   },

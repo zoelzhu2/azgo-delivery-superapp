@@ -50,6 +50,13 @@ export interface PartnerApplication {
   accountNumber?: string;
   accountHolder?: string;
 
+  // Opsi Bundling Paket POS Kasir & Laporan Keuangan
+  posPackageType?: import('./user').PosPackageType | 'NONE';
+  posSubscriptionRequested?: boolean;
+  posPaymentMethod?: 'TRANSFER_BANK' | 'QRIS' | 'FREE_TRIAL';
+  posPaymentProofUrl?: string;
+  posPaymentProofName?: string;
+
   // Akun Mitra yang Digenerate jika Disetujui
   generatedUserId?: string;
   tempPassword?: string;

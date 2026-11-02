@@ -297,6 +297,7 @@ export const MOCK_DRIVERS: any[] = [
 // 7. Mock Services
 export const MOCK_SERVICES: any[] = [
   { id: 'AZ_DELIVERY', name: 'Az Delivery', description: 'Antar Kilat Makanan Resto & Barang Instan Motor', icon: 'Bike', isActive: true },
+  { id: 'AZ_RIDE', name: 'Az Ride & Car', description: 'Perjalanan Penumpang Nyaman & Cepat dengan Motor (Az Ride) dan Mobil (Az Car)', icon: 'Car', isActive: true },
   { id: 'AZ_COURIER', name: 'Az Courier', description: 'Ekspedisi Pengiriman Reguler Antar Kota / Kecamatan dengan Resi AWB', icon: 'Package', isActive: true },
   { id: 'AZ_EXPRESS', name: 'Az Express', description: 'Layanan Kilat Prioritas Garansi Sampai Hari yang Sama (Sameday)', icon: 'Zap', isActive: true },
   { id: 'AZ_CARGO', name: 'Az Cargo', description: 'Muatan Berat & Pindahan Rumah (Pickup Bak, Box, & Truk Engkel)', icon: 'Truck', isActive: true },
