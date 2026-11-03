@@ -14,7 +14,8 @@ import {
   Sparkles,
   Receipt,
   Check,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { getRegenciesByProvince } from '../../utils/indonesiaGeo';
 
@@ -52,6 +53,141 @@ export const MART_CATEGORIES = [
   'Pakan & Aksesoris Hewan (Pet Shop)',
   'Lainnya (Ketik Sendiri)'
 ];
+
+interface DocumentUploadSlotProps {
+  title: string;
+  subtitle: string;
+  preview: string | null;
+  fileName?: string;
+  badgeText?: string;
+  accentColor?: 'amber' | 'emerald';
+  onUpload: (file: File) => void;
+  onRemove: () => void;
+}
+
+const DocumentUploadSlot: React.FC<DocumentUploadSlotProps> = ({
+  title,
+  subtitle,
+  preview,
+  fileName,
+  badgeText = 'Wajib',
+  accentColor = 'amber',
+  onUpload,
+  onRemove
+}) => {
+  const isPdf = preview?.startsWith('data:application/pdf') || fileName?.toLowerCase().endsWith('.pdf');
+  const isAmber = accentColor === 'amber';
+
+  return (
+    <div
+      className={`rounded-2xl border transition-all ${
+        preview
+          ? 'bg-emerald-50/70 border-emerald-300 p-2.5 space-y-2'
+          : `bg-white hover:bg-slate-50 border-2 border-dashed ${
+              isAmber ? 'border-amber-300 hover:border-amber-400' : 'border-emerald-300 hover:border-emerald-400'
+            } p-3`
+      }`}
+    >
+      {preview ? (
+        <div>
+          <div className="relative group rounded-xl overflow-hidden border border-emerald-200 bg-white">
+            {isPdf ? (
+              <div className="w-full h-24 bg-rose-50 flex flex-col items-center justify-center p-2 text-center">
+                <FileText className="w-8 h-8 text-rose-600 mb-1" />
+                <span className="text-[10px] font-bold text-rose-900 truncate max-w-full">
+                  Dokumen PDF
+                </span>
+              </div>
+            ) : (
+              <img
+                src={preview}
+                alt={title}
+                className="w-full h-24 object-cover"
+              />
+            )}
+            <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <label className="p-1.5 bg-white text-slate-800 rounded-lg cursor-pointer hover:bg-slate-100 text-[10px] font-bold shadow-sm transition">
+                <span>Ganti</span>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onUpload(f);
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={onRemove}
+                className="p-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-[10px] font-bold shadow-sm transition"
+                title="Hapus"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-2">
+            <div className="flex items-center justify-between gap-1">
+              <span className="font-extrabold text-slate-900 text-[11px] truncate block">
+                {title}
+              </span>
+              <span className="text-[9px] text-emerald-800 font-extrabold bg-emerald-100 px-1.5 py-0.5 rounded-full shrink-0">
+                ✓ Terupload
+              </span>
+            </div>
+            {fileName && (
+              <p className="text-[10px] text-slate-500 truncate mt-0.5" title={fileName}>
+                {fileName}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <label className="cursor-pointer block text-center space-y-1.5 py-1">
+          <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+            <span className="font-bold text-slate-800 text-[11px] truncate text-left">
+              {title}
+            </span>
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+              isAmber ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              {badgeText}
+            </span>
+          </div>
+
+          <div className="py-2 flex flex-col items-center justify-center space-y-1">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              isAmber ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              <Upload className="w-4 h-4" />
+            </div>
+            <p className="text-[10px] text-slate-500 font-medium">
+              {subtitle}
+            </p>
+            <span className={`inline-block mt-0.5 px-3 py-1 text-[10px] font-extrabold rounded-lg text-white shadow-xs transition active:scale-95 ${
+              isAmber ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'
+            }`}>
+              Pilih Dokumen
+            </span>
+          </div>
+
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUpload(f);
+            }}
+            className="hidden"
+          />
+        </label>
+      )}
+    </div>
+  );
+};
 
 export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> = ({
   isOpen,
@@ -104,7 +240,129 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
 
+  // Document Uploads State - Driver
+  const [docDriverKtpPreview, setDocDriverKtpPreview] = useState<string | null>(null);
+  const [docDriverKtpName, setDocDriverKtpName] = useState<string>('');
+  const [docDriverSimPreview, setDocDriverSimPreview] = useState<string | null>(null);
+  const [docDriverSimName, setDocDriverSimName] = useState<string>('');
+  const [docDriverStnkPreview, setDocDriverStnkPreview] = useState<string | null>(null);
+  const [docDriverStnkName, setDocDriverStnkName] = useState<string>('');
+  const [docDriverVehiclePreview, setDocDriverVehiclePreview] = useState<string | null>(null);
+  const [docDriverVehicleName, setDocDriverVehicleName] = useState<string>('');
+
+  // Document Uploads State - Merchant
+  const [docMerchantKtpPreview, setDocMerchantKtpPreview] = useState<string | null>(null);
+  const [docMerchantKtpName, setDocMerchantKtpName] = useState<string>('');
+  const [docMerchantStorePreview, setDocMerchantStorePreview] = useState<string | null>(null);
+  const [docMerchantStoreName, setDocMerchantStoreName] = useState<string>('');
+
+  const [docUploadError, setDocUploadError] = useState<string>('');
+
   if (!isOpen) return null;
+
+  const handleDriverDocUpload = (file: File, type: 'ktp' | 'sim' | 'stnk' | 'vehicle') => {
+    if (file.size > 5 * 1024 * 1024) {
+      setDocUploadError(`Ukuran file "${file.name}" maksimal 5 MB.`);
+      return;
+    }
+    setDocUploadError('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (type === 'ktp') {
+        setDocDriverKtpPreview(dataUrl);
+        setDocDriverKtpName(file.name);
+      } else if (type === 'sim') {
+        setDocDriverSimPreview(dataUrl);
+        setDocDriverSimName(file.name);
+      } else if (type === 'stnk') {
+        setDocDriverStnkPreview(dataUrl);
+        setDocDriverStnkName(file.name);
+      } else if (type === 'vehicle') {
+        setDocDriverVehiclePreview(dataUrl);
+        setDocDriverVehicleName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDriverBatchUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setDocUploadError('');
+    const fileArray = Array.from(files);
+    const targets: Array<'ktp' | 'sim' | 'stnk' | 'vehicle'> = ['ktp', 'sim', 'stnk', 'vehicle'];
+    fileArray.slice(0, 4).forEach((file, idx) => {
+      handleDriverDocUpload(file, targets[idx]);
+    });
+  };
+
+  const handleUseSampleDriverDocs = () => {
+    setDocDriverKtpPreview('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600');
+    setDocDriverKtpName('KTP_Driver_Demo.jpg');
+    setDocDriverSimPreview('https://images.unsplash.com/photo-1544717305-2782549b5136?w=600');
+    setDocDriverSimName('SIM_Aktif_Demo.jpg');
+    setDocDriverStnkPreview('https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600');
+    setDocDriverStnkName('STNK_Kendaraan_Demo.jpg');
+    setDocDriverVehiclePreview('https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600');
+    setDocDriverVehicleName('Foto_Kendaraan_Demo.jpg');
+    setDocUploadError('');
+  };
+
+  const handleMerchantDocUpload = (file: File, type: 'ktp' | 'store') => {
+    if (file.size > 5 * 1024 * 1024) {
+      setDocUploadError(`Ukuran file "${file.name}" maksimal 5 MB.`);
+      return;
+    }
+    setDocUploadError('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (type === 'ktp') {
+        setDocMerchantKtpPreview(dataUrl);
+        setDocMerchantKtpName(file.name);
+      } else if (type === 'store') {
+        setDocMerchantStorePreview(dataUrl);
+        setDocMerchantStoreName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleMerchantBatchUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setDocUploadError('');
+    const fileArray = Array.from(files);
+    const targets: Array<'ktp' | 'store'> = ['ktp', 'store'];
+    fileArray.slice(0, 2).forEach((file, idx) => {
+      handleMerchantDocUpload(file, targets[idx]);
+    });
+  };
+
+  const handleUseSampleMerchantDocs = () => {
+    setDocMerchantKtpPreview('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600');
+    setDocMerchantKtpName('KTP_Pemilik_Demo.jpg');
+    setDocMerchantStorePreview('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600');
+    setDocMerchantStoreName('Foto_Toko_Demo.jpg');
+    setDocUploadError('');
+  };
+
+  const countDriverDocs = () => {
+    let count = 0;
+    if (docDriverKtpPreview) count++;
+    if (docDriverSimPreview) count++;
+    if (docDriverStnkPreview) count++;
+    if (docDriverVehiclePreview) count++;
+    return count;
+  };
+
+  const countMerchantDocs = () => {
+    let count = 0;
+    if (docMerchantKtpPreview) count++;
+    if (docMerchantStorePreview) count++;
+    return count;
+  };
 
   const handleMerchantTypeChange = (type: MerchantCategoryType) => {
     setMerchantType(type);
@@ -206,11 +464,21 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
         accountNumber,
         accountHolder: accountHolder || fullName,
         documents: {
-          ktpUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600',
-          simUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600',
-          stnkUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600',
-          vehiclePhotoUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600',
-          storePhotoUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600'
+          ktpUrl: partnerType === 'DRIVER' 
+            ? (docDriverKtpPreview || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600')
+            : (docMerchantKtpPreview || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600'),
+          simUrl: partnerType === 'DRIVER' 
+            ? (docDriverSimPreview || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600')
+            : undefined,
+          stnkUrl: partnerType === 'DRIVER' 
+            ? (docDriverStnkPreview || 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600')
+            : undefined,
+          vehiclePhotoUrl: partnerType === 'DRIVER' 
+            ? (docDriverVehiclePreview || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600')
+            : undefined,
+          storePhotoUrl: partnerType === 'MERCHANT' 
+            ? (docMerchantStorePreview || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600')
+            : undefined
         }
       };
 
@@ -539,14 +807,126 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                     </div>
                   </div>
 
-                  <div className="p-3 bg-white rounded-xl border border-amber-200 text-[11px] text-slate-600 flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Upload className="w-4 h-4 text-amber-600 shrink-0" />
-                      Foto KTP, SIM, STNK & Kendaraan
-                    </span>
-                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      ✓ Siap Ditinjau Admin
-                    </span>
+                  {/* Upload Dokumen Driver (KTP, SIM, STNK, Kendaraan) */}
+                  <div className="bg-white p-4 rounded-2xl border border-amber-200 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-100 pb-2.5">
+                      <div>
+                        <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                          <Upload className="w-4 h-4 text-amber-600" />
+                          Upload Berkas Persyaratan Driver (KTP, SIM, STNK & Kendaraan)
+                        </span>
+                        <p className="text-[11px] text-slate-500">
+                          Lampirkan foto dokumen asli untuk verifikasi keaslian oleh Tim Admin AZ GO (JPG, PNG, PDF maks 5MB)
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleUseSampleDriverDocs}
+                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"
+                          title="Isi otomatis dengan contoh berkas untuk simulasi"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Gunakan Contoh Demo</span>
+                        </button>
+
+                        <label className="cursor-pointer px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition shadow-xs">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Pilih Sekaligus</span>
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*,.pdf"
+                            onChange={handleDriverBatchUpload}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {countDriverDocs() > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDocDriverKtpPreview(null); setDocDriverKtpName('');
+                              setDocDriverSimPreview(null); setDocDriverSimName('');
+                              setDocDriverStnkPreview(null); setDocDriverStnkName('');
+                              setDocDriverVehiclePreview(null); setDocDriverVehicleName('');
+                            }}
+                            className="text-rose-600 hover:text-rose-800 text-[11px] font-bold px-2 py-1 hover:bg-rose-50 rounded-lg transition"
+                            title="Reset semua dokumen"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4 Document Upload Slots Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                      <DocumentUploadSlot
+                        title="1. Foto KTP Asli"
+                        subtitle="KTP jelas & terbaca"
+                        preview={docDriverKtpPreview}
+                        fileName={docDriverKtpName}
+                        badgeText="Wajib"
+                        accentColor="amber"
+                        onUpload={(file) => handleDriverDocUpload(file, 'ktp')}
+                        onRemove={() => { setDocDriverKtpPreview(null); setDocDriverKtpName(''); }}
+                      />
+
+                      <DocumentUploadSlot
+                        title="2. Foto SIM Aktif"
+                        subtitle="SIM C / A / B1 aktif"
+                        preview={docDriverSimPreview}
+                        fileName={docDriverSimName}
+                        badgeText="Wajib"
+                        accentColor="amber"
+                        onUpload={(file) => handleDriverDocUpload(file, 'sim')}
+                        onRemove={() => { setDocDriverSimPreview(null); setDocDriverSimName(''); }}
+                      />
+
+                      <DocumentUploadSlot
+                        title="3. Foto STNK Kendaraan"
+                        subtitle="Pajak / masa berlaku aktif"
+                        preview={docDriverStnkPreview}
+                        fileName={docDriverStnkName}
+                        badgeText="Wajib"
+                        accentColor="amber"
+                        onUpload={(file) => handleDriverDocUpload(file, 'stnk')}
+                        onRemove={() => { setDocDriverStnkPreview(null); setDocDriverStnkName(''); }}
+                      />
+
+                      <DocumentUploadSlot
+                        title="4. Foto Fisik Kendaraan"
+                        subtitle="Tampak plat & fisik armada"
+                        preview={docDriverVehiclePreview}
+                        fileName={docDriverVehicleName}
+                        badgeText="Wajib"
+                        accentColor="amber"
+                        onUpload={(file) => handleDriverDocUpload(file, 'vehicle')}
+                        onRemove={() => { setDocDriverVehiclePreview(null); setDocDriverVehicleName(''); }}
+                      />
+                    </div>
+
+                    {docUploadError && (
+                      <p className="text-xs text-rose-600 font-bold flex items-center gap-1 pt-1">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {docUploadError}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 text-[11px] border-t border-slate-100">
+                      <span className="text-slate-500">
+                        Status Berkas: <strong className="text-slate-800">{countDriverDocs()}/4 Berkas Terpasang</strong>
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] border ${
+                        countDriverDocs() >= 4 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        {countDriverDocs() >= 4 ? '✓ Dokumen Lengkap (Siap Ditinjau Admin)' : 'Belum Semua Berkas Diupload (Bisa Pakai Demo)'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1120,14 +1500,102 @@ export const PartnerRegistrationModal: React.FC<PartnerRegistrationModalProps> =
                     )}
                   </div>
 
-                  <div className="p-3 bg-white rounded-xl border border-emerald-200 text-[11px] text-slate-600 flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Upload className="w-4 h-4 text-emerald-600 shrink-0" />
-                      Foto KTP Pemilik & Tampak Depan Toko
-                    </span>
-                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      ✓ Siap Ditinjau Admin
-                    </span>
+                  {/* Upload Dokumen Toko / Resto & Mart (KTP Pemilik & Foto Toko) */}
+                  <div className="bg-white p-4 rounded-2xl border border-emerald-200 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-100 pb-2.5">
+                      <div>
+                        <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                          <Upload className="w-4 h-4 text-emerald-600" />
+                          Upload Berkas Persyaratan Toko / Resto (KTP & Foto Toko)
+                        </span>
+                        <p className="text-[11px] text-slate-500">
+                          Lampirkan foto identitas pemilik dan foto fisik tampak depan toko / dapur untuk verifikasi Admin AZ GO (Maks 5MB)
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleUseSampleMerchantDocs}
+                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"
+                          title="Isi otomatis dengan contoh berkas untuk simulasi"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Gunakan Contoh Demo</span>
+                        </button>
+
+                        <label className="cursor-pointer px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition shadow-xs">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Pilih Sekaligus</span>
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*,.pdf"
+                            onChange={handleMerchantBatchUpload}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {countMerchantDocs() > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDocMerchantKtpPreview(null); setDocMerchantKtpName('');
+                              setDocMerchantStorePreview(null); setDocMerchantStoreName('');
+                            }}
+                            className="text-rose-600 hover:text-rose-800 text-[11px] font-bold px-2 py-1 hover:bg-rose-50 rounded-lg transition"
+                            title="Reset semua dokumen"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 2 Document Upload Slots Grid for Merchant */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <DocumentUploadSlot
+                        title="1. Foto KTP Pemilik Usaha"
+                        subtitle="KTP jelas sesuai nama penanggung jawab"
+                        preview={docMerchantKtpPreview}
+                        fileName={docMerchantKtpName}
+                        badgeText="Wajib"
+                        accentColor="emerald"
+                        onUpload={(file) => handleMerchantDocUpload(file, 'ktp')}
+                        onRemove={() => { setDocMerchantKtpPreview(null); setDocMerchantKtpName(''); }}
+                      />
+
+                      <DocumentUploadSlot
+                        title="2. Foto Tampak Depan Toko / Resto"
+                        subtitle="Foto plang usaha, etalase, atau area masak"
+                        preview={docMerchantStorePreview}
+                        fileName={docMerchantStoreName}
+                        badgeText="Wajib"
+                        accentColor="emerald"
+                        onUpload={(file) => handleMerchantDocUpload(file, 'store')}
+                        onRemove={() => { setDocMerchantStorePreview(null); setDocMerchantStoreName(''); }}
+                      />
+                    </div>
+
+                    {docUploadError && (
+                      <p className="text-xs text-rose-600 font-bold flex items-center gap-1 pt-1">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {docUploadError}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 text-[11px] border-t border-slate-100">
+                      <span className="text-slate-500">
+                        Status Berkas: <strong className="text-slate-800">{countMerchantDocs()}/2 Berkas Terpasang</strong>
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] border ${
+                        countMerchantDocs() >= 2 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        {countMerchantDocs() >= 2 ? '✓ Dokumen Lengkap (Siap Ditinjau Admin)' : 'Belum Semua Berkas Diupload (Bisa Pakai Demo)'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
