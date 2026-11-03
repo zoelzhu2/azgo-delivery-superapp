@@ -37,7 +37,10 @@ import {
   History,
   BarChart3,
   Send,
-  Upload
+  Upload,
+  FileSpreadsheet,
+  FileText,
+  Download
 } from 'lucide-react';
 
 interface MerchantPortalProps {
@@ -92,6 +95,7 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
   const [posDebitRef, setPosDebitRef] = useState<string>('');
   const [completedPosSale, setCompletedPosSale] = useState<any | null>(null);
   const [buyerWaPhone, setBuyerWaPhone] = useState('');
+  const [showReportExportModal, setShowReportExportModal] = useState(false);
   const [posSalesHistory, setPosSalesHistory] = useState<any[]>([
     {
       id: 'pos-101',
@@ -785,6 +789,643 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
 
     const url = `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
+  };
+
+  const handleDownloadExcelReport = () => {
+    const storeTitle = currentUser?.fullName || (selectedStoreType === 'FOOD' ? 'Resto Kuliner AZ GO' : 'Az Mart Superstore');
+    const storeAddress = currentUser?.phone ? `Hubungi: ${currentUser.phone}` : 'Jl. Merdeka Barat No. 12';
+    const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    const offlineTotal = posSalesHistory.reduce((sum, s) => sum + s.total, 0);
+    const onlineCompletedOrders = orders.filter(o => o.status === 'COMPLETED');
+    const onlineTotal = onlineCompletedOrders.reduce((sum, o) => sum + o.total, 0);
+    const grandTotal = offlineTotal + onlineTotal;
+
+    const cashTotal = posSalesHistory.filter(s => s.payMethod === 'CASH').reduce((sum, s) => sum + s.total, 0);
+    const qrisTotal = posSalesHistory.filter(s => s.payMethod === 'QRIS').reduce((sum, s) => sum + s.total, 0);
+    const debitTotal = posSalesHistory.filter(s => s.payMethod === 'DEBIT').reduce((sum, s) => sum + s.total, 0);
+
+    const excelHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Laporan Keuangan</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          body { font-family: Calibri, Arial, sans-serif; }
+          .title { font-size: 16pt; font-weight: bold; color: #064e3b; }
+          .subtitle { font-size: 11pt; color: #475569; }
+          .header-cell { background-color: #065f46; color: #ffffff; font-weight: bold; border: 0.5pt solid #047857; text-align: center; }
+          .data-cell { border: 0.5pt solid #cbd5e1; }
+          .number-cell { border: 0.5pt solid #cbd5e1; text-align: right; }
+          .total-cell { background-color: #ecfdf5; font-weight: bold; border: 0.5pt solid #047857; }
+          .section-header { font-size: 13pt; font-weight: bold; color: #1e293b; background-color: #f1f5f9; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr>
+            <td colspan="7" class="title">${storeTitle.toUpperCase()}</td>
+          </tr>
+          <tr>
+            <td colspan="7" class="subtitle">Alamat/Kontak: ${storeAddress}</td>
+          </tr>
+          <tr>
+            <td colspan="7" class="subtitle">Laporan Keuangan Terpadu (Kasir Offline POS & Pesanan Online AZ GO)</td>
+          </tr>
+          <tr>
+            <td colspan="7" class="subtitle">Tanggal Laporan: ${dateStr} - Pukul ${timeStr} WIB</td>
+          </tr>
+          <tr><td></td></tr>
+
+          <!-- RINGKASAN OMSET -->
+          <tr>
+            <td colspan="4" class="section-header">A. RINGKASAN TOTAL OMSET PENJUALAN</td>
+          </tr>
+          <tr>
+            <th class="header-cell">Sumber Pendapatan</th>
+            <th class="header-cell">Jumlah Transaksi</th>
+            <th colspan="2" class="header-cell">Total Nominal (Rp)</th>
+          </tr>
+          <tr>
+            <td class="data-cell">Penjualan Kasir Offline (POS)</td>
+            <td class="data-cell" style="text-align: center;">${posSalesHistory.length} Transaksi</td>
+            <td colspan="2" class="number-cell">${offlineTotal.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td class="data-cell">Pesanan Online AZ GO Delivery</td>
+            <td class="data-cell" style="text-align: center;">${onlineCompletedOrders.length} Pesanan</td>
+            <td colspan="2" class="number-cell">${onlineTotal.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td class="total-cell">TOTAL OMSET BERSIH TOKO</td>
+            <td class="total-cell" style="text-align: center;">${posSalesHistory.length + onlineCompletedOrders.length} Transaksi</td>
+            <td colspan="2" class="total-cell" style="text-align: right;">Rp ${grandTotal.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr><td></td></tr>
+
+          <!-- METODE PEMBAYARAN KASIR -->
+          <tr>
+            <td colspan="4" class="section-header">B. BREAKDOWN METODE PEMBAYARAN KASIR OFFLINE</td>
+          </tr>
+          <tr>
+            <th class="header-cell">Metode Bayar</th>
+            <th class="header-cell">Jumlah Transaksi</th>
+            <th colspan="2" class="header-cell">Total Diterima (Rp)</th>
+          </tr>
+          <tr>
+            <td class="data-cell">Uang Tunai (Cash)</td>
+            <td class="data-cell" style="text-align: center;">${posSalesHistory.filter(s => s.payMethod === 'CASH').length}</td>
+            <td colspan="2" class="number-cell">${cashTotal.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td class="data-cell">QRIS Dinamis / Statis</td>
+            <td class="data-cell" style="text-align: center;">${posSalesHistory.filter(s => s.payMethod === 'QRIS').length}</td>
+            <td colspan="2" class="number-cell">${qrisTotal.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td class="data-cell">Mesin EDC / Debit Card</td>
+            <td class="data-cell" style="text-align: center;">${posSalesHistory.filter(s => s.payMethod === 'DEBIT').length}</td>
+            <td colspan="2" class="number-cell">${debitTotal.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr><td></td></tr>
+
+          <!-- RINCIAN TRANSAKSI KASIR POS -->
+          <tr>
+            <td colspan="7" class="section-header">C. RINCIAN TRANSAKSI KASIR TOKO HARI INI</td>
+          </tr>
+          <tr>
+            <th class="header-cell">No</th>
+            <th class="header-cell">Jam & No. Struk</th>
+            <th class="header-cell">Tipe / Meja</th>
+            <th class="header-cell">Nama Pelanggan</th>
+            <th class="header-cell">Daftar Item Pembelian</th>
+            <th class="header-cell">Metode Bayar</th>
+            <th class="header-cell">Total (Rp)</th>
+          </tr>
+          ${posSalesHistory.map((s, idx) => `
+            <tr>
+              <td class="data-cell" style="text-align: center;">${idx + 1}</td>
+              <td class="data-cell">${s.time} WIB - ${s.receiptNumber}</td>
+              <td class="data-cell">${s.orderType === 'DINE_IN' ? `Makan (${s.tableNumber})` : 'Bungkus / Kasir'}</td>
+              <td class="data-cell">${s.customerName || 'Walk-in'}</td>
+              <td class="data-cell">${s.items.map((it: any) => `${it.qty}x ${it.name}`).join('; ')}</td>
+              <td class="data-cell" style="text-align: center;">${s.payMethod}</td>
+              <td class="number-cell">${s.total.toLocaleString('id-ID')}</td>
+            </tr>
+          `).join('')}
+          <tr>
+            <td colspan="6" class="total-cell" style="text-align: right;">TOTAL PENJUALAN KASIR:</td>
+            <td class="total-cell" style="text-align: right;">Rp ${offlineTotal.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr><td></td></tr>
+
+          <!-- RINCIAN PESANAN ONLINE DELIVERY -->
+          <tr>
+            <td colspan="7" class="section-header">D. RINCIAN PESANAN ONLINE DELIVERY AZ GO (SELESAI)</td>
+          </tr>
+          <tr>
+            <th class="header-cell">No</th>
+            <th class="header-cell">No. Pesanan</th>
+            <th class="header-cell">Pelanggan</th>
+            <th class="header-cell">No. HP</th>
+            <th class="header-cell">Alamat Antar</th>
+            <th class="header-cell">Status</th>
+            <th class="header-cell">Total Belanja (Rp)</th>
+          </tr>
+          ${onlineCompletedOrders.length > 0 ? onlineCompletedOrders.map((o, idx) => `
+            <tr>
+              <td class="data-cell" style="text-align: center;">${idx + 1}</td>
+              <td class="data-cell">${o.orderNumber || o.id}</td>
+              <td class="data-cell">${o.customerName || '-'}</td>
+              <td class="data-cell">${o.customerPhone || '-'}</td>
+              <td class="data-cell">${o.deliveryAddress || '-'}</td>
+              <td class="data-cell" style="text-align: center;">SELESAI</td>
+              <td class="number-cell">${(o.total || 0).toLocaleString('id-ID')}</td>
+            </tr>
+          `).join('') : `
+            <tr>
+              <td colspan="7" class="data-cell" style="text-align: center; color: #64748b;">Belum ada pesanan online selesai untuk periode ini</td>
+            </tr>
+          `}
+          <tr>
+            <td colspan="6" class="total-cell" style="text-align: right;">TOTAL PESANAN ONLINE:</td>
+            <td class="total-cell" style="text-align: right;">Rp ${onlineTotal.toLocaleString('id-ID')}</td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\uFEFF' + excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = storeTitle.replace(/[^a-zA-Z0-9]/g, '_');
+    a.href = url;
+    a.download = `Laporan_Keuangan_${safeName}_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrintDocumentReport = (paperSize: 'A4' | 'F4', mode: 'print' | 'pdf' = 'print') => {
+    const storeTitle = currentUser?.fullName || (selectedStoreType === 'FOOD' ? 'Resto Kuliner AZ GO' : 'Az Mart Superstore');
+    const storeAddress = currentUser?.phone ? `WhatsApp / Telp: ${currentUser.phone}` : 'Jl. Merdeka Barat No. 12';
+    const storePhone = currentUser?.phone || '08123456789';
+    const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const docNumber = `REP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const offlineTotal = posSalesHistory.reduce((sum, s) => sum + s.total, 0);
+    const offlineCount = posSalesHistory.length;
+    const onlineCompletedOrders = orders.filter(o => o.status === 'COMPLETED');
+    const onlineTotal = onlineCompletedOrders.reduce((sum, o) => sum + o.total, 0);
+    const onlineCount = onlineCompletedOrders.length;
+    const grandTotal = offlineTotal + onlineTotal;
+    const grandCount = offlineCount + onlineCount;
+
+    const cashTotal = posSalesHistory.filter(s => s.payMethod === 'CASH').reduce((sum, s) => sum + s.total, 0);
+    const cashCount = posSalesHistory.filter(s => s.payMethod === 'CASH').length;
+    const qrisTotal = posSalesHistory.filter(s => s.payMethod === 'QRIS').reduce((sum, s) => sum + s.total, 0);
+    const qrisCount = posSalesHistory.filter(s => s.payMethod === 'QRIS').length;
+    const debitTotal = posSalesHistory.filter(s => s.payMethod === 'DEBIT').reduce((sum, s) => sum + s.total, 0);
+    const debitCount = posSalesHistory.filter(s => s.payMethod === 'DEBIT').length;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=800');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const paperCss = paperSize === 'A4' 
+      ? '@page { size: A4 portrait; margin: 15mm 15mm 18mm 15mm; }'
+      : '@page { size: 215mm 330mm portrait; margin: 15mm 15mm 18mm 15mm; }';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Laporan_Keuangan_${storeTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}</title>
+        <style>
+          ${paperCss}
+          * { box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            font-size: 10pt;
+            line-height: 1.4;
+          }
+          .no-print {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 9999;
+            font-family: sans-serif;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          }
+          .page-container {
+            padding: 24px 30px;
+            max-width: 1000px;
+            margin: 0 auto;
+          }
+          @media print {
+            .no-print { display: none !important; }
+            .page-container { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 9pt;
+          }
+          th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 8pt;
+            letter-spacing: 0.5px;
+            border: 1px solid #cbd5e1;
+            padding: 7px 8px;
+          }
+          td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 8px;
+            vertical-align: top;
+          }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          .font-bold { font-weight: bold; }
+          .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+          .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 7.5pt;
+            font-weight: 800;
+          }
+        </style>
+      </head>
+      <body>
+        <!-- Control Header for Screen -->
+        <div class="no-print">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <span style="font-weight: 900; font-size: 15px; color: #10b981; letter-spacing: 0.5px;">AZ GO POS • LAPORAN ${paperSize === 'A4' ? 'A4' : 'F4 (FOLIO)'}</span>
+            <span style="font-size: 12px; color: #cbd5e1;">
+              ${mode === 'pdf' 
+                ? '💡 <strong>Untuk Mengunduh PDF:</strong> Pilih Destination / Printer: <em>"Save as PDF" (Simpan sebagai PDF)</em> pada kotak cetak browser.' 
+                : '💡 Pastikan ukuran kertas pada printer fisik Anda telah disesuaikan dengan <strong>' + (paperSize === 'A4' ? 'A4' : 'F4 / Folio') + '</strong>.'}
+            </span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button onclick="window.print()" style="background: #10b981; color: #0f172a; border: none; font-weight: 800; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+              🖨️ ${mode === 'pdf' ? 'Unduh / Simpan File PDF' : 'Cetak Dokumen Sekarang'}
+            </button>
+            <button onclick="window.close()" style="background: #334155; color: #fff; border: none; font-weight: bold; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+              Tutup
+            </button>
+          </div>
+        </div>
+
+        <div class="page-container">
+          <!-- KOP SURAT / DOKUMEN LAPORAN -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px;">
+            <div>
+              <div style="font-size: 20px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: -0.5px;">${storeTitle}</div>
+              <div style="font-size: 9pt; color: #64748b; margin-top: 3px;">${storeAddress} • Kontak: ${storePhone}</div>
+              <div style="display: inline-block; margin-top: 6px; background: #ecfdf5; color: #047857; font-size: 8pt; font-weight: 800; padding: 2.5px 8px; border-radius: 6px; border: 1px solid #a7f3d0;">
+                MITRA RESMI AZ GO SUPERAPP (${selectedStoreType === 'FOOD' ? 'KULINER & RESTORAN' : 'MART & RETAIL'})
+              </div>
+            </div>
+
+            <div style="text-align: right;">
+              <div style="font-size: 13pt; font-weight: 900; color: #047857; text-transform: uppercase;">LAPORAN KEUANGAN & OMSET HARIAN</div>
+              <div style="font-size: 8.5pt; color: #64748b; margin-top: 3px;">No. Referensi: <strong class="font-mono text-slate-900">${docNumber}</strong></div>
+              <div style="font-size: 8.5pt; color: #64748b;">Tanggal Cetak: <strong>${dateStr} - ${timeStr} WIB</strong></div>
+              <div style="margin-top: 5px;">
+                <span style="background: #f1f5f9; color: #1e293b; font-size: 8pt; font-weight: 800; padding: 2.5px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                  FORMAT KERTAS: ${paperSize === 'A4' ? 'A4 (210 x 297 mm)' : 'F4 / FOLIO (215 x 330 mm)'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- DIVIDER GARIS GANDA -->
+          <div style="border-top: 2.5px solid #0f172a; margin-top: 4px; margin-bottom: 2px;"></div>
+          <div style="border-top: 1px solid #94a3b8; margin-bottom: 16px;"></div>
+
+          <!-- EXECUTIVE KPI SUMMARY CARDS -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+            <div style="border: 1px solid #a7f3d0; background: #f0fdf4; border-radius: 10px; padding: 10px 14px;">
+              <div style="font-size: 8pt; font-weight: 800; color: #047857; text-transform: uppercase; letter-spacing: 0.5px;">1. PENJUALAN KASIR OFFLINE (POS)</div>
+              <div style="font-size: 16pt; font-weight: 900; color: #064e3b; margin-top: 3px;">Rp ${offlineTotal.toLocaleString('id-ID')}</div>
+              <div style="font-size: 8pt; color: #059669; margin-top: 2px; font-weight: 600;">Total ${offlineCount} Transaksi Selesai</div>
+            </div>
+
+            <div style="border: 1px solid #c7d2fe; background: #eef2ff; border-radius: 10px; padding: 10px 14px;">
+              <div style="font-size: 8pt; font-weight: 800; color: #4338ca; text-transform: uppercase; letter-spacing: 0.5px;">2. PESANAN ONLINE DELIVERY</div>
+              <div style="font-size: 16pt; font-weight: 900; color: #312e81; margin-top: 3px;">Rp ${onlineTotal.toLocaleString('id-ID')}</div>
+              <div style="font-size: 8pt; color: #4f46e5; margin-top: 2px; font-weight: 600;">Total ${onlineCount} Pesanan Selesai</div>
+            </div>
+
+            <div style="border: 1px solid #064e3b; background: #064e3b; color: #ffffff; border-radius: 10px; padding: 10px 14px;">
+              <div style="font-size: 8pt; font-weight: 800; color: #a7f3d0; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL OMSET BERSIH TOKO</div>
+              <div style="font-size: 17pt; font-weight: 900; color: #ffffff; margin-top: 3px;">Rp ${grandTotal.toLocaleString('id-ID')}</div>
+              <div style="font-size: 8pt; color: #d1fae5; margin-top: 2px; font-weight: 600;">Gabungan Kasir + Online (${grandCount} Total)</div>
+            </div>
+          </div>
+
+          <!-- METODE PEMBAYARAN KASIR TABLE -->
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-transform: uppercase; border-left: 3.5px solid #059669; padding-left: 8px;">
+              Rekapitulasi Penerimaan Kasir Berdasarkan Metode Pembayaran
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Metode Pembayaran</th>
+                  <th class="text-center" style="width: 140px;">Jumlah Transaksi</th>
+                  <th class="text-right" style="width: 180px;">Total Nominal Diterima</th>
+                  <th class="text-right" style="width: 100px;">Porsi (%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>💵 Uang Tunai (Cash)</strong></td>
+                  <td class="text-center">${cashCount} Transaksi</td>
+                  <td class="text-right font-mono font-bold">Rp ${cashTotal.toLocaleString('id-ID')}</td>
+                  <td class="text-right">${offlineTotal > 0 ? ((cashTotal / offlineTotal) * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr>
+                  <td><strong>📱 QRIS (Dinamis / Statis)</strong></td>
+                  <td class="text-center">${qrisCount} Transaksi</td>
+                  <td class="text-right font-mono font-bold">Rp ${qrisTotal.toLocaleString('id-ID')}</td>
+                  <td class="text-right">${offlineTotal > 0 ? ((qrisTotal / offlineTotal) * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr>
+                  <td><strong>💳 Kartu Debit / Mesin EDC</strong></td>
+                  <td class="text-center">${debitCount} Transaksi</td>
+                  <td class="text-right font-mono font-bold">Rp ${debitTotal.toLocaleString('id-ID')}</td>
+                  <td class="text-right">${offlineTotal > 0 ? ((debitTotal / offlineTotal) * 100).toFixed(1) : 0}%</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr style="background: #f8fafc; font-weight: bold;">
+                  <td>TOTAL KASIR OFFLINE</td>
+                  <td class="text-center">${offlineCount} Transaksi</td>
+                  <td class="text-right font-mono font-bold" style="color: #047857;">Rp ${offlineTotal.toLocaleString('id-ID')}</td>
+                  <td class="text-right">100.0%</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- RINCIAN TRANSAKSI KASIR OFFLINE -->
+          <div style="margin-bottom: 18px;">
+            <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-transform: uppercase; border-left: 3.5px solid #059669; padding-left: 8px;">
+              Rincian Transaksi Kasir Toko Hari Ini (${offlineCount} Transaksi)
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 25px;" class="text-center">No</th>
+                  <th style="width: 130px;">Waktu & No. Struk</th>
+                  <th style="width: 90px;">Tipe / Meja</th>
+                  <th style="width: 100px;">Pelanggan</th>
+                  <th>Item Menu / Produk</th>
+                  <th style="width: 70px;" class="text-center">Metode</th>
+                  <th style="width: 100px;" class="text-right">Total (Rp)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${posSalesHistory.map((s, idx) => `
+                  <tr>
+                    <td class="text-center">${idx + 1}</td>
+                    <td>
+                      <div class="font-bold font-mono">${s.receiptNumber}</div>
+                      <div style="font-size: 8pt; color: #64748b;">${s.time} WIB</div>
+                    </td>
+                    <td>
+                      <span class="badge" style="background: ${s.orderType === 'DINE_IN' ? '#fef3c7; color: #92400e;' : '#dbeafe; color: #1e40af;'}">
+                        ${s.orderType === 'DINE_IN' ? 'Makan (' + s.tableNumber + ')' : 'Bungkus'}
+                      </span>
+                    </td>
+                    <td>${s.customerName || 'Walk-In'}</td>
+                    <td style="font-size: 8.5pt;">${s.items.map((it: any) => it.qty + 'x ' + it.name).join(', ')}</td>
+                    <td class="text-center"><span class="badge" style="background: #f1f5f9; color: #334155;">${s.payMethod}</span></td>
+                    <td class="text-right font-mono font-bold">Rp ${s.total.toLocaleString('id-ID')}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="background: #f1f5f9; font-weight: bold; border-top: 2px solid #0f172a;">
+                  <td colspan="6" class="text-right">TOTAL PENJUALAN KASIR OFFLINE:</td>
+                  <td class="text-right font-mono font-bold" style="font-size: 10.5pt; color: #047857;">Rp ${offlineTotal.toLocaleString('id-ID')}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- RINCIAN PESANAN ONLINE DELIVERY -->
+          <div style="margin-bottom: 24px;">
+            <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-transform: uppercase; border-left: 3.5px solid #4338ca; padding-left: 8px;">
+              Rincian Pesanan Online Delivery AZ GO Selesai (${onlineCount} Pesanan)
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 25px;" class="text-center">No</th>
+                  <th style="width: 120px;">No. Pesanan</th>
+                  <th style="width: 130px;">Pelanggan & No. HP</th>
+                  <th>Alamat Pengantaran</th>
+                  <th style="width: 75px;" class="text-center">Status</th>
+                  <th style="width: 100px;" class="text-right">Total (Rp)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${onlineCompletedOrders.length > 0 ? onlineCompletedOrders.map((o, idx) => `
+                  <tr>
+                    <td class="text-center">${idx + 1}</td>
+                    <td class="font-bold font-mono">${o.orderNumber || o.id}</td>
+                    <td>
+                      <div>${o.customerName || '-'}</div>
+                      <div style="font-size: 8pt; color: #64748b;">${o.customerPhone || ''}</div>
+                    </td>
+                    <td style="font-size: 8.5pt;">${o.deliveryAddress || '-'}</td>
+                    <td class="text-center"><span class="badge" style="background: #dcfce7; color: #166534;">SELESAI</span></td>
+                    <td class="text-right font-mono font-bold">Rp ${(o.total || 0).toLocaleString('id-ID')}</td>
+                  </tr>
+                `).join('') : `
+                  <tr>
+                    <td colspan="6" class="text-center" style="color: #94a3b8; padding: 12px;">Belum ada pesanan online delivery yang selesai pada periode ini</td>
+                  </tr>
+                `}
+              </tbody>
+              <tfoot>
+                <tr style="background: #f1f5f9; font-weight: bold; border-top: 2px solid #0f172a;">
+                  <td colspan="5" class="text-right">TOTAL OMSET ONLINE DELIVERY:</td>
+                  <td class="text-right font-mono font-bold" style="font-size: 10.5pt; color: #4338ca;">Rp ${onlineTotal.toLocaleString('id-ID')}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- LEMBAR PENGESAHAN & TANDA TANGAN -->
+          <div style="margin-top: 28px; page-break-inside: avoid;">
+            <div style="text-align: right; font-size: 8.5pt; color: #64748b; margin-bottom: 12px;">
+              Dokumen ini digenerate secara otomatis melalui AZGO POS SuperApp pada ${dateStr}, pukul ${timeStr} WIB.
+            </div>
+            <table style="border: none; margin-top: 0; width: 100%;">
+              <tr style="border: none;">
+                <td style="border: none; width: 50%; text-align: center; vertical-align: top; padding: 0 20px;">
+                  <div style="font-size: 9pt; color: #64748b;">Dibuat / Diverifikasi Oleh:</div>
+                  <div style="font-weight: 800; font-size: 9.5pt; margin-top: 2px; color: #0f172a;">Kasir / Staf Keuangan Toko</div>
+                  <div style="height: 55px;"></div>
+                  <div style="font-weight: 800; font-size: 9.5pt; border-bottom: 1.5px solid #0f172a; display: inline-block; min-width: 180px; padding-bottom: 2px;">
+                    ( ${currentUser?.fullName || 'Kasir Toko'} )
+                  </div>
+                </td>
+                <td style="border: none; width: 50%; text-align: center; vertical-align: top; padding: 0 20px;">
+                  <div style="font-size: 9pt; color: #64748b;">Mengetahui & Menyetujui:</div>
+                  <div style="font-weight: 800; font-size: 9.5pt; margin-top: 2px; color: #0f172a;">Pemilik / Manajer Toko</div>
+                  <div style="height: 55px;"></div>
+                  <div style="font-weight: 800; font-size: 9.5pt; border-bottom: 1.5px solid #0f172a; display: inline-block; min-width: 180px; padding-bottom: 2px;">
+                    ( .................................................... )
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 350);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handlePrintZReportThermal = () => {
+    const storeTitle = currentUser?.fullName || (selectedStoreType === 'FOOD' ? 'Ayam Geprek Sambal Bawang Juara' : 'Az Mart Superstore');
+    const storeAddress = currentUser?.phone ? `Hubungi: ${currentUser.phone}` : 'Jl. Merdeka Barat No. 12';
+    const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    const offlineTotal = posSalesHistory.reduce((sum, s) => sum + s.total, 0);
+    const onlineCompletedOrders = orders.filter(o => o.status === 'COMPLETED');
+    const onlineTotal = onlineCompletedOrders.reduce((sum, o) => sum + o.total, 0);
+    const grandTotal = offlineTotal + onlineTotal;
+
+    const cashTotal = posSalesHistory.filter(s => s.payMethod === 'CASH').reduce((sum, s) => sum + s.total, 0);
+    const qrisTotal = posSalesHistory.filter(s => s.payMethod === 'QRIS').reduce((sum, s) => sum + s.total, 0);
+    const debitTotal = posSalesHistory.filter(s => s.payMethod === 'DEBIT').reduce((sum, s) => sum + s.total, 0);
+
+    const printWindow = window.open('', '_blank', 'width=380,height=600');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Z-Report - ${dateStr}</title>
+        <style>
+          @page { size: 58mm auto; margin: 0; }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 58mm;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 8px 6px;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #000;
+          }
+          .text-center { text-align: center; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .double-divider { border-top: 2px dashed #000; margin: 6px 0; }
+          .row { display: flex; justify-content: space-between; margin: 2px 0; }
+          @media print {
+            body { width: 100%; margin: 0; padding: 4px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div class="bold" style="font-size: 13px; text-transform: uppercase;">${storeTitle}</div>
+          <div style="font-size: 10px;">${storeAddress}</div>
+          <div class="double-divider"></div>
+          <div class="bold" style="font-size: 12px;">*** REKAP HARIAN (Z-REPORT) ***</div>
+          <div style="font-size: 10px;">${dateStr}</div>
+          <div style="font-size: 10px;">Pukul: ${timeStr} WIB</div>
+          <div style="font-size: 10px;">Kasir: ${currentUser?.fullName || 'Kasir Toko'}</div>
+        </div>
+        <div class="divider"></div>
+        <div class="row"><span>Kasir Offline:</span><span class="bold">Rp ${offlineTotal.toLocaleString('id-ID')}</span></div>
+        <div class="row" style="font-size: 10px; color: #555;"><span>- Transaksi:</span><span>${posSalesHistory.length} tx</span></div>
+        <div class="row"><span>Online AZ GO:</span><span class="bold">Rp ${onlineTotal.toLocaleString('id-ID')}</span></div>
+        <div class="row" style="font-size: 10px; color: #555;"><span>- Pesanan Selesai:</span><span>${onlineCompletedOrders.length} order</span></div>
+        <div class="double-divider"></div>
+        <div class="row bold" style="font-size: 12px;"><span>TOTAL OMSET:</span><span>Rp ${grandTotal.toLocaleString('id-ID')}</span></div>
+        <div class="divider"></div>
+        <div class="bold" style="font-size: 10px; margin-top: 4px;">RINCIAN PEMBAYARAN:</div>
+        <div class="row"><span>• Tunai (Cash):</span><span>Rp ${cashTotal.toLocaleString('id-ID')}</span></div>
+        <div class="row"><span>• QRIS:</span><span>Rp ${qrisTotal.toLocaleString('id-ID')}</span></div>
+        <div class="row"><span>• Debit EDC:</span><span>Rp ${debitTotal.toLocaleString('id-ID')}</span></div>
+        <div class="divider"></div>
+        <div class="text-center" style="font-size: 10px; margin-top: 10px;">
+          <div>Tanda Tangan Kasir:</div>
+          <div style="height: 35px;"></div>
+          <div>(......................)</div>
+          <div style="margin-top: 8px; font-size: 8px; color: #555;">AZGO POS SuperApp</div>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
@@ -2223,14 +2864,38 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => alert('🖨️ Mencetak Rekap Harian Z-Report Kasir ke printer thermal...')}
-                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition"
-                      >
-                        <Printer className="w-4 h-4 text-emerald-400" />
-                        <span>Cetak Rekap Kasir (Z-Report)</span>
-                      </button>
+                      {/* Action Buttons: Unduh Excel, Unduh PDF, Cetak A4 / F4 */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleDownloadExcelReport}
+                          className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-[0.98]"
+                          title="Unduh laporan dalam format spreadsheet Microsoft Excel"
+                        >
+                          <FileSpreadsheet className="w-4 h-4" />
+                          <span>Unduh Excel (.xls)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePrintDocumentReport('A4', 'pdf')}
+                          className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-[0.98]"
+                          title="Unduh laporan dalam format PDF resmi (A4)"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Unduh PDF (A4)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowReportExportModal(true)}
+                          className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-[0.98]"
+                          title="Buka pilihan ukuran cetak (A4 / F4 / PDF / Thermal)"
+                        >
+                          <Printer className="w-4 h-4 text-emerald-400" />
+                          <span>Print Laporan (A4 / F4)...</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Integrated KPI Cards */}
@@ -3207,6 +3872,193 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                 className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition disabled:opacity-50"
               >
                 {posSubmitLoading ? 'Mengirim...' : 'Kirim Pengajuan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PILIHAN CETAK & UNDUH LAPORAN ================= */}
+      {showReportExportModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl space-y-5 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+              <div>
+                <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block">
+                  Export & Cetak Dokumen Usaha
+                </span>
+                <h3 className="font-black text-slate-900 text-lg flex items-center gap-2 mt-0.5">
+                  <Printer className="w-5 h-5 text-emerald-600" />
+                  Cetak & Unduh Laporan Keuangan
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pilih format kertas besar resmi (A4 / F4) atau unduh file Excel (.xls)
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowReportExportModal(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Grid of Choices */}
+            <div className="space-y-3">
+              {/* OPSI 1: KERTAS A4 (PDF / CETAK) */}
+              <div className="p-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/20 transition space-y-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-indigo-100 text-indigo-700">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-slate-900 text-sm">Dokumen Ukuran A4 (210 x 297 mm)</h4>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-indigo-100 text-indigo-800">
+                          Standar Dokumen
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Format resmi standar kantor & arsip. Siap print atau simpan langsung sebagai file PDF.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReportExportModal(false);
+                      handlePrintDocumentReport('A4', 'print');
+                    }}
+                    className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Print ke Kertas A4</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReportExportModal(false);
+                      handlePrintDocumentReport('A4', 'pdf');
+                    }}
+                    className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Unduh PDF (A4)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* OPSI 2: KERTAS F4 / FOLIO (PDF / CETAK) */}
+              <div className="p-4 rounded-2xl border-2 border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/20 transition space-y-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-blue-100 text-blue-700">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-slate-900 text-sm">Dokumen Ukuran F4 / Folio (215 x 330 mm)</h4>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-100 text-blue-800">
+                          Kertas Panjang HVS
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Format kertas folio panjang Indonesia. Memuat data tabel transaksi lebih banyak per lembar.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReportExportModal(false);
+                      handlePrintDocumentReport('F4', 'print');
+                    }}
+                    className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Print ke Kertas F4</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReportExportModal(false);
+                      handlePrintDocumentReport('F4', 'pdf');
+                    }}
+                    className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Unduh PDF (F4)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* OPSI 3: EXCEL SPREADSHEET */}
+              <div className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70 transition space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-emerald-600 text-white">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-slate-900 text-sm">Unduh File Format Excel (.xls / .xlsx)</h4>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-200 text-emerald-900">
+                        Tabel & Rumus
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      File spreadsheet kompatibel dengan Microsoft Excel, Google Sheets, dan WPS Office untuk pembukuan akuntansi.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReportExportModal(false);
+                    handleDownloadExcelReport();
+                  }}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.98]"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download File Excel (.xls) Sekarang</span>
+                </button>
+              </div>
+
+              {/* OPSI 4: THERMAL Z-REPORT (58mm) */}
+              <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Receipt className="w-4 h-4 text-slate-500" />
+                  <div>
+                    <h5 className="font-bold text-slate-800 text-xs">Struk Rekap Kasir Mini (Thermal 58mm)</h5>
+                    <p className="text-[10px] text-slate-500">Z-Report ringkas untuk printer kasir Bluetooth kecil</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReportExportModal(false);
+                    handlePrintZReportThermal();
+                  }}
+                  className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-lg text-[11px] transition"
+                >
+                  Cetak 58mm
+                </button>
+              </div>
+            </div>
+
+            {/* Footer close */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowReportExportModal(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+              >
+                Tutup
               </button>
             </div>
           </div>
