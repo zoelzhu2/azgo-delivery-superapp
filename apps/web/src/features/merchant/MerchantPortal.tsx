@@ -40,7 +40,8 @@ import {
   Upload,
   FileSpreadsheet,
   FileText,
-  Download
+  Download,
+  ChevronDown
 } from 'lucide-react';
 
 interface MerchantPortalProps {
@@ -96,10 +97,15 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
   const [completedPosSale, setCompletedPosSale] = useState<any | null>(null);
   const [buyerWaPhone, setBuyerWaPhone] = useState('');
   const [showReportExportModal, setShowReportExportModal] = useState(false);
+  const [reportPeriod, setReportPeriod] = useState<'DAILY' | 'MONTHLY' | 'YEARLY'>('DAILY');
+  const [openDownloadDropdown, setOpenDownloadDropdown] = useState(false);
+  const [openPrintDropdown, setOpenPrintDropdown] = useState(false);
   const [posSalesHistory, setPosSalesHistory] = useState<any[]>([
     {
       id: 'pos-101',
-      receiptNumber: 'POS-20261102-001',
+      receiptNumber: 'POS-20261103-001',
+      dateIso: new Date().toISOString().slice(0, 10),
+      date: new Date().toLocaleDateString('id-ID'),
       time: '09:15',
       orderType: 'DINE_IN',
       tableNumber: 'Meja 02',
@@ -119,7 +125,9 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
     },
     {
       id: 'pos-102',
-      receiptNumber: 'POS-20261102-002',
+      receiptNumber: 'POS-20261103-002',
+      dateIso: new Date().toISOString().slice(0, 10),
+      date: new Date().toLocaleDateString('id-ID'),
       time: '09:40',
       orderType: 'TAKEAWAY',
       tableNumber: '-',
@@ -134,6 +142,94 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
       payMethod: 'CASH',
       cashTendered: 50000,
       cashChange: 30000,
+      cashierName: currentUser?.fullName || 'Kasir Resto'
+    },
+    {
+      id: 'pos-201',
+      receiptNumber: 'POS-20261102-088',
+      dateIso: '2026-11-02',
+      date: '02/11/2026',
+      time: '13:20',
+      orderType: 'DINE_IN',
+      tableNumber: 'Meja 05',
+      customerName: 'Ibu Rahayu',
+      items: [
+        { name: 'Paket Ayam Geprek Sambal Matah', qty: 2, price: 25000 },
+        { name: 'Jus Alpukat', qty: 2, price: 12500 }
+      ],
+      subtotal: 75000,
+      discount: 0,
+      tax: 0,
+      total: 75000,
+      payMethod: 'DEBIT',
+      cashTendered: 75000,
+      cashChange: 0,
+      cashierName: currentUser?.fullName || 'Kasir Resto'
+    },
+    {
+      id: 'pos-202',
+      receiptNumber: 'POS-20261101-042',
+      dateIso: '2026-11-01',
+      date: '01/11/2026',
+      time: '18:35',
+      orderType: 'TAKEAWAY',
+      tableNumber: '-',
+      customerName: 'Hendra Setiawan',
+      items: [
+        { name: 'Paket Bebek Goreng Kremes', qty: 3, price: 32000 },
+        { name: 'Tahu & Tempe Goreng Krispi', qty: 2, price: 7000 }
+      ],
+      subtotal: 110000,
+      discount: 0,
+      tax: 0,
+      total: 110000,
+      payMethod: 'QRIS',
+      cashTendered: 110000,
+      cashChange: 0,
+      cashierName: currentUser?.fullName || 'Kasir Resto'
+    },
+    {
+      id: 'pos-301',
+      receiptNumber: 'POS-20261028-112',
+      dateIso: '2026-10-28',
+      date: '28/10/2026',
+      time: '19:10',
+      orderType: 'DINE_IN',
+      tableNumber: 'Meja 01',
+      customerName: 'Keluarga Budi',
+      items: [
+        { name: 'Paket Keluarga 4 Orang', qty: 1, price: 135000 },
+        { name: 'Es Teh Manis', qty: 4, price: 5000 }
+      ],
+      subtotal: 155000,
+      discount: 10000,
+      tax: 0,
+      total: 145000,
+      payMethod: 'CASH',
+      cashTendered: 150000,
+      cashChange: 5000,
+      cashierName: currentUser?.fullName || 'Kasir Resto'
+    },
+    {
+      id: 'pos-302',
+      receiptNumber: 'POS-20260918-095',
+      dateIso: '2026-09-18',
+      date: '18/09/2026',
+      time: '12:45',
+      orderType: 'DINE_IN',
+      tableNumber: 'Meja 03',
+      customerName: 'Rian Pratama',
+      items: [
+        { name: 'Paket Ayam Geprek Jumbo', qty: 5, price: 38000 },
+        { name: 'Air Mineral', qty: 5, price: 5000 }
+      ],
+      subtotal: 215000,
+      discount: 0,
+      tax: 0,
+      total: 215000,
+      payMethod: 'DEBIT',
+      cashTendered: 215000,
+      cashChange: 0,
       cashierName: currentUser?.fullName || 'Kasir Resto'
     }
   ]);
@@ -277,6 +373,28 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
       driverName: 'Menunggu Pengambilan Driver / Kurir',
       deliveryType: undefined,
       isSelfCourier: false
+    },
+    {
+      id: 'ord-m-comp-1',
+      orderNumber: 'AZD-118820',
+      customerName: 'Budi Santoso',
+      customerPhone: '081399887766',
+      items: [{ name: 'Paket Ayam Bakar Madu', qty: 2, price: 28000 }],
+      total: 56000,
+      status: 'COMPLETED',
+      dateIso: '2026-11-02',
+      deliveryAddress: 'Jl. Sudirman No. 45, Blok B'
+    },
+    {
+      id: 'ord-m-comp-2',
+      orderNumber: 'AZD-117210',
+      customerName: 'Siti Rahma',
+      customerPhone: '085711223344',
+      items: [{ name: 'Ayam Geprek Keju Mozzarella', qty: 3, price: 32000 }],
+      total: 96000,
+      status: 'COMPLETED',
+      dateIso: '2026-10-22',
+      deliveryAddress: 'Komplek Griya Asri No. 12'
     }
   ]);
 
@@ -728,6 +846,7 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
     const newSale = {
       id: `pos-${Date.now()}`,
       receiptNumber: `POS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
+      dateIso: new Date().toISOString().slice(0, 10),
       date: new Date().toLocaleDateString('id-ID'),
       time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       orderType: posOrderType,
@@ -791,20 +910,86 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
     window.open(url, '_blank');
   };
 
+  const getFilteredReportData = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    let sales = [...posSalesHistory];
+    let onlineOrders = orders.filter(o => o.status === 'COMPLETED');
+
+    if (reportPeriod === 'DAILY') {
+      sales = sales.filter(s => {
+        if (!s.dateIso) return true;
+        return s.dateIso === todayStr;
+      });
+      onlineOrders = onlineOrders.filter(o => {
+        if (!o.dateIso) return false;
+        return o.dateIso === todayStr;
+      });
+    } else if (reportPeriod === 'MONTHLY') {
+      sales = sales.filter(s => {
+        if (!s.dateIso) return true;
+        const d = new Date(s.dateIso);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      });
+      onlineOrders = onlineOrders.filter(o => {
+        if (!o.dateIso) return false;
+        const d = new Date(o.dateIso);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      });
+    } else if (reportPeriod === 'YEARLY') {
+      sales = sales.filter(s => {
+        if (!s.dateIso) return true;
+        const d = new Date(s.dateIso);
+        return d.getFullYear() === currentYear;
+      });
+      onlineOrders = onlineOrders.filter(o => {
+        if (!o.dateIso) return false;
+        const d = new Date(o.dateIso);
+        return d.getFullYear() === currentYear;
+      });
+    }
+
+    const offlineTotal = sales.reduce((sum, s) => sum + s.total, 0);
+    const onlineTotal = onlineOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const grandTotal = offlineTotal + onlineTotal;
+
+    const cashTotal = sales.filter(s => s.payMethod === 'CASH').reduce((sum, s) => sum + s.total, 0);
+    const qrisTotal = sales.filter(s => s.payMethod === 'QRIS').reduce((sum, s) => sum + s.total, 0);
+    const debitTotal = sales.filter(s => s.payMethod === 'DEBIT').reduce((sum, s) => sum + s.total, 0);
+
+    const periodLabel = reportPeriod === 'DAILY'
+      ? `Hari Ini (${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })})`
+      : reportPeriod === 'MONTHLY'
+      ? `Bulan Ini (${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })})`
+      : `Tahun Ini (Tahun ${currentYear})`;
+
+    const periodShortName = reportPeriod === 'DAILY' ? 'Harian' : reportPeriod === 'MONTHLY' ? 'Bulanan' : 'Tahunan';
+
+    return {
+      sales,
+      onlineOrders,
+      offlineTotal,
+      onlineTotal,
+      grandTotal,
+      cashTotal,
+      qrisTotal,
+      debitTotal,
+      periodLabel,
+      periodShortName
+    };
+  };
+
   const handleDownloadExcelReport = () => {
+    const reportData = getFilteredReportData();
     const storeTitle = currentUser?.fullName || (selectedStoreType === 'FOOD' ? 'Resto Kuliner AZ GO' : 'Az Mart Superstore');
     const storeAddress = currentUser?.phone ? `Hubungi: ${currentUser.phone}` : 'Jl. Merdeka Barat No. 12';
     const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-    const offlineTotal = posSalesHistory.reduce((sum, s) => sum + s.total, 0);
-    const onlineCompletedOrders = orders.filter(o => o.status === 'COMPLETED');
-    const onlineTotal = onlineCompletedOrders.reduce((sum, o) => sum + o.total, 0);
-    const grandTotal = offlineTotal + onlineTotal;
-
-    const cashTotal = posSalesHistory.filter(s => s.payMethod === 'CASH').reduce((sum, s) => sum + s.total, 0);
-    const qrisTotal = posSalesHistory.filter(s => s.payMethod === 'QRIS').reduce((sum, s) => sum + s.total, 0);
-    const debitTotal = posSalesHistory.filter(s => s.payMethod === 'DEBIT').reduce((sum, s) => sum + s.total, 0);
+    const { sales, onlineOrders, offlineTotal, onlineTotal, grandTotal, cashTotal, qrisTotal, debitTotal, periodLabel, periodShortName } = reportData;
 
     const excelHtml = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -815,7 +1000,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
           <x:ExcelWorkbook>
             <x:ExcelWorksheets>
               <x:ExcelWorksheet>
-                <x:Name>Laporan Keuangan</x:Name>
+                <x:Name>Laporan ${periodShortName}</x:Name>
                 <x:WorksheetOptions>
                   <x:DisplayGridlines/>
                 </x:WorksheetOptions>
@@ -847,13 +1032,16 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
             <td colspan="7" class="subtitle">Laporan Keuangan Terpadu (Kasir Offline POS & Pesanan Online AZ GO)</td>
           </tr>
           <tr>
-            <td colspan="7" class="subtitle">Tanggal Laporan: ${dateStr} - Pukul ${timeStr} WIB</td>
+            <td colspan="7" class="subtitle"><strong>Periode Laporan: LAPORAN ${periodShortName.toUpperCase()} - ${periodLabel}</strong></td>
+          </tr>
+          <tr>
+            <td colspan="7" class="subtitle">Tanggal Unduh: ${dateStr} - Pukul ${timeStr} WIB</td>
           </tr>
           <tr><td></td></tr>
 
           <!-- RINGKASAN OMSET -->
           <tr>
-            <td colspan="4" class="section-header">A. RINGKASAN TOTAL OMSET PENJUALAN</td>
+            <td colspan="4" class="section-header">A. RINGKASAN TOTAL OMSET PENJUALAN (${periodShortName.toUpperCase()})</td>
           </tr>
           <tr>
             <th class="header-cell">Sumber Pendapatan</th>
@@ -862,17 +1050,17 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
           </tr>
           <tr>
             <td class="data-cell">Penjualan Kasir Offline (POS)</td>
-            <td class="data-cell" style="text-align: center;">${posSalesHistory.length} Transaksi</td>
+            <td class="data-cell" style="text-align: center;">${sales.length} Transaksi</td>
             <td colspan="2" class="number-cell">${offlineTotal.toLocaleString('id-ID')}</td>
           </tr>
           <tr>
             <td class="data-cell">Pesanan Online AZ GO Delivery</td>
-            <td class="data-cell" style="text-align: center;">${onlineCompletedOrders.length} Pesanan</td>
+            <td class="data-cell" style="text-align: center;">${onlineOrders.length} Pesanan</td>
             <td colspan="2" class="number-cell">${onlineTotal.toLocaleString('id-ID')}</td>
           </tr>
           <tr>
             <td class="total-cell">TOTAL OMSET BERSIH TOKO</td>
-            <td class="total-cell" style="text-align: center;">${posSalesHistory.length + onlineCompletedOrders.length} Transaksi</td>
+            <td class="total-cell" style="text-align: center;">${sales.length + onlineOrders.length} Transaksi</td>
             <td colspan="2" class="total-cell" style="text-align: right;">Rp ${grandTotal.toLocaleString('id-ID')}</td>
           </tr>
           <tr><td></td></tr>
@@ -888,38 +1076,38 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
           </tr>
           <tr>
             <td class="data-cell">Uang Tunai (Cash)</td>
-            <td class="data-cell" style="text-align: center;">${posSalesHistory.filter(s => s.payMethod === 'CASH').length}</td>
+            <td class="data-cell" style="text-align: center;">${sales.filter(s => s.payMethod === 'CASH').length}</td>
             <td colspan="2" class="number-cell">${cashTotal.toLocaleString('id-ID')}</td>
           </tr>
           <tr>
             <td class="data-cell">QRIS Dinamis / Statis</td>
-            <td class="data-cell" style="text-align: center;">${posSalesHistory.filter(s => s.payMethod === 'QRIS').length}</td>
+            <td class="data-cell" style="text-align: center;">${sales.filter(s => s.payMethod === 'QRIS').length}</td>
             <td colspan="2" class="number-cell">${qrisTotal.toLocaleString('id-ID')}</td>
           </tr>
           <tr>
             <td class="data-cell">Mesin EDC / Debit Card</td>
-            <td class="data-cell" style="text-align: center;">${posSalesHistory.filter(s => s.payMethod === 'DEBIT').length}</td>
+            <td class="data-cell" style="text-align: center;">${sales.filter(s => s.payMethod === 'DEBIT').length}</td>
             <td colspan="2" class="number-cell">${debitTotal.toLocaleString('id-ID')}</td>
           </tr>
           <tr><td></td></tr>
 
           <!-- RINCIAN TRANSAKSI KASIR POS -->
           <tr>
-            <td colspan="7" class="section-header">C. RINCIAN TRANSAKSI KASIR TOKO HARI INI</td>
+            <td colspan="7" class="section-header">C. RINCIAN TRANSAKSI KASIR TOKO (${sales.length} Transaksi)</td>
           </tr>
           <tr>
             <th class="header-cell">No</th>
-            <th class="header-cell">Jam & No. Struk</th>
+            <th class="header-cell">Tanggal & No. Struk</th>
             <th class="header-cell">Tipe / Meja</th>
             <th class="header-cell">Nama Pelanggan</th>
             <th class="header-cell">Daftar Item Pembelian</th>
             <th class="header-cell">Metode Bayar</th>
             <th class="header-cell">Total (Rp)</th>
           </tr>
-          ${posSalesHistory.map((s, idx) => `
+          ${sales.map((s, idx) => `
             <tr>
               <td class="data-cell" style="text-align: center;">${idx + 1}</td>
-              <td class="data-cell">${s.time} WIB - ${s.receiptNumber}</td>
+              <td class="data-cell">${s.date || s.dateIso || '-'} ${s.time} WIB - ${s.receiptNumber}</td>
               <td class="data-cell">${s.orderType === 'DINE_IN' ? `Makan (${s.tableNumber})` : 'Bungkus / Kasir'}</td>
               <td class="data-cell">${s.customerName || 'Walk-in'}</td>
               <td class="data-cell">${s.items.map((it: any) => `${it.qty}x ${it.name}`).join('; ')}</td>
@@ -935,7 +1123,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
 
           <!-- RINCIAN PESANAN ONLINE DELIVERY -->
           <tr>
-            <td colspan="7" class="section-header">D. RINCIAN PESANAN ONLINE DELIVERY AZ GO (SELESAI)</td>
+            <td colspan="7" class="section-header">D. RINCIAN PESANAN ONLINE DELIVERY AZ GO (${onlineOrders.length} Pesanan)</td>
           </tr>
           <tr>
             <th class="header-cell">No</th>
@@ -946,7 +1134,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
             <th class="header-cell">Status</th>
             <th class="header-cell">Total Belanja (Rp)</th>
           </tr>
-          ${onlineCompletedOrders.length > 0 ? onlineCompletedOrders.map((o, idx) => `
+          ${onlineOrders.length > 0 ? onlineOrders.map((o, idx) => `
             <tr>
               <td class="data-cell" style="text-align: center;">${idx + 1}</td>
               <td class="data-cell">${o.orderNumber || o.id}</td>
@@ -975,7 +1163,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
     const a = document.createElement('a');
     const safeName = storeTitle.replace(/[^a-zA-Z0-9]/g, '_');
     a.href = url;
-    a.download = `Laporan_Keuangan_${safeName}_${new Date().toISOString().slice(0, 10)}.xls`;
+    a.download = `Laporan_Keuangan_${periodShortName}_${safeName}_${new Date().toISOString().slice(0, 10)}.xls`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -983,6 +1171,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
   };
 
   const handlePrintDocumentReport = (paperSize: 'A4' | 'F4', mode: 'print' | 'pdf' = 'print') => {
+    const reportData = getFilteredReportData();
     const storeTitle = currentUser?.fullName || (selectedStoreType === 'FOOD' ? 'Resto Kuliner AZ GO' : 'Az Mart Superstore');
     const storeAddress = currentUser?.phone ? `WhatsApp / Telp: ${currentUser.phone}` : 'Jl. Merdeka Barat No. 12';
     const storePhone = currentUser?.phone || '08123456789';
@@ -990,20 +1179,10 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const docNumber = `REP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const offlineTotal = posSalesHistory.reduce((sum, s) => sum + s.total, 0);
-    const offlineCount = posSalesHistory.length;
-    const onlineCompletedOrders = orders.filter(o => o.status === 'COMPLETED');
-    const onlineTotal = onlineCompletedOrders.reduce((sum, o) => sum + o.total, 0);
-    const onlineCount = onlineCompletedOrders.length;
-    const grandTotal = offlineTotal + onlineTotal;
+    const { sales, onlineOrders, offlineTotal, onlineTotal, grandTotal, cashTotal, qrisTotal, debitTotal, periodLabel, periodShortName } = reportData;
+    const offlineCount = sales.length;
+    const onlineCount = onlineOrders.length;
     const grandCount = offlineCount + onlineCount;
-
-    const cashTotal = posSalesHistory.filter(s => s.payMethod === 'CASH').reduce((sum, s) => sum + s.total, 0);
-    const cashCount = posSalesHistory.filter(s => s.payMethod === 'CASH').length;
-    const qrisTotal = posSalesHistory.filter(s => s.payMethod === 'QRIS').reduce((sum, s) => sum + s.total, 0);
-    const qrisCount = posSalesHistory.filter(s => s.payMethod === 'QRIS').length;
-    const debitTotal = posSalesHistory.filter(s => s.payMethod === 'DEBIT').reduce((sum, s) => sum + s.total, 0);
-    const debitCount = posSalesHistory.filter(s => s.payMethod === 'DEBIT').length;
 
     const printWindow = window.open('', '_blank', 'width=900,height=800');
     if (!printWindow) {
@@ -1020,7 +1199,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Laporan_Keuangan_${storeTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}</title>
+        <title>Laporan_Keuangan_${periodShortName}_${storeTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}</title>
         <style>
           ${paperCss}
           * { box-sizing: border-box; }
@@ -1097,7 +1276,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
         <!-- Control Header for Screen -->
         <div class="no-print">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <span style="font-weight: 900; font-size: 15px; color: #10b981; letter-spacing: 0.5px;">AZ GO POS • LAPORAN ${paperSize === 'A4' ? 'A4' : 'F4 (FOLIO)'}</span>
+            <span style="font-weight: 900; font-size: 15px; color: #10b981; letter-spacing: 0.5px;">AZ GO POS • LAPORAN ${periodShortName.toUpperCase()} (${paperSize === 'A4' ? 'A4' : 'F4'})</span>
             <span style="font-size: 12px; color: #cbd5e1;">
               ${mode === 'pdf' 
                 ? '💡 <strong>Untuk Mengunduh PDF:</strong> Pilih Destination / Printer: <em>"Save as PDF" (Simpan sebagai PDF)</em> pada kotak cetak browser.' 
@@ -1126,8 +1305,9 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
             </div>
 
             <div style="text-align: right;">
-              <div style="font-size: 13pt; font-weight: 900; color: #047857; text-transform: uppercase;">LAPORAN KEUANGAN & OMSET HARIAN</div>
-              <div style="font-size: 8.5pt; color: #64748b; margin-top: 3px;">No. Referensi: <strong class="font-mono text-slate-900">${docNumber}</strong></div>
+              <div style="font-size: 13pt; font-weight: 900; color: #047857; text-transform: uppercase;">LAPORAN KEUANGAN (${periodShortName.toUpperCase()})</div>
+              <div style="font-size: 8.5pt; color: #64748b; margin-top: 3px;">Periode: <strong>${periodLabel}</strong></div>
+              <div style="font-size: 8.5pt; color: #64748b;">No. Referensi: <strong class="font-mono text-slate-900">${docNumber}</strong></div>
               <div style="font-size: 8.5pt; color: #64748b;">Tanggal Cetak: <strong>${dateStr} - ${timeStr} WIB</strong></div>
               <div style="margin-top: 5px;">
                 <span style="background: #f1f5f9; color: #1e293b; font-size: 8pt; font-weight: 800; padding: 2.5px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
@@ -1165,7 +1345,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
           <!-- METODE PEMBAYARAN KASIR TABLE -->
           <div style="margin-bottom: 16px;">
             <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-transform: uppercase; border-left: 3.5px solid #059669; padding-left: 8px;">
-              Rekapitulasi Penerimaan Kasir Berdasarkan Metode Pembayaran
+              Rekapitulasi Penerimaan Kasir Berdasarkan Metode Pembayaran (${periodShortName})
             </div>
             <table>
               <thead>
@@ -1179,19 +1359,19 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
               <tbody>
                 <tr>
                   <td><strong>💵 Uang Tunai (Cash)</strong></td>
-                  <td class="text-center">${cashCount} Transaksi</td>
+                  <td class="text-center">${cashTotal > 0 ? sales.filter(s => s.payMethod === 'CASH').length : 0} Transaksi</td>
                   <td class="text-right font-mono font-bold">Rp ${cashTotal.toLocaleString('id-ID')}</td>
                   <td class="text-right">${offlineTotal > 0 ? ((cashTotal / offlineTotal) * 100).toFixed(1) : 0}%</td>
                 </tr>
                 <tr>
                   <td><strong>📱 QRIS (Dinamis / Statis)</strong></td>
-                  <td class="text-center">${qrisCount} Transaksi</td>
+                  <td class="text-center">${qrisTotal > 0 ? sales.filter(s => s.payMethod === 'QRIS').length : 0} Transaksi</td>
                   <td class="text-right font-mono font-bold">Rp ${qrisTotal.toLocaleString('id-ID')}</td>
                   <td class="text-right">${offlineTotal > 0 ? ((qrisTotal / offlineTotal) * 100).toFixed(1) : 0}%</td>
                 </tr>
                 <tr>
                   <td><strong>💳 Kartu Debit / Mesin EDC</strong></td>
-                  <td class="text-center">${debitCount} Transaksi</td>
+                  <td class="text-center">${debitTotal > 0 ? sales.filter(s => s.payMethod === 'DEBIT').length : 0} Transaksi</td>
                   <td class="text-right font-mono font-bold">Rp ${debitTotal.toLocaleString('id-ID')}</td>
                   <td class="text-right">${offlineTotal > 0 ? ((debitTotal / offlineTotal) * 100).toFixed(1) : 0}%</td>
                 </tr>
@@ -1210,7 +1390,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
           <!-- RINCIAN TRANSAKSI KASIR OFFLINE -->
           <div style="margin-bottom: 18px;">
             <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-transform: uppercase; border-left: 3.5px solid #059669; padding-left: 8px;">
-              Rincian Transaksi Kasir Toko Hari Ini (${offlineCount} Transaksi)
+              Rincian Transaksi Kasir Toko (${periodShortName} - ${offlineCount} Transaksi)
             </div>
             <table>
               <thead>
@@ -1225,12 +1405,12 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                 </tr>
               </thead>
               <tbody>
-                ${posSalesHistory.map((s, idx) => `
+                ${sales.length > 0 ? sales.map((s, idx) => `
                   <tr>
                     <td class="text-center">${idx + 1}</td>
                     <td>
                       <div class="font-bold font-mono">${s.receiptNumber}</div>
-                      <div style="font-size: 8pt; color: #64748b;">${s.time} WIB</div>
+                      <div style="font-size: 8pt; color: #64748b;">${s.date || s.dateIso || ''} ${s.time} WIB</div>
                     </td>
                     <td>
                       <span class="badge" style="background: ${s.orderType === 'DINE_IN' ? '#fef3c7; color: #92400e;' : '#dbeafe; color: #1e40af;'}">
@@ -1242,7 +1422,11 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                     <td class="text-center"><span class="badge" style="background: #f1f5f9; color: #334155;">${s.payMethod}</span></td>
                     <td class="text-right font-mono font-bold">Rp ${s.total.toLocaleString('id-ID')}</td>
                   </tr>
-                `).join('')}
+                `).join('') : `
+                  <tr>
+                    <td colspan="7" class="text-center" style="color: #94a3b8; padding: 12px;">Tidak ada transaksi kasir pada periode ini</td>
+                  </tr>
+                `}
               </tbody>
               <tfoot>
                 <tr style="background: #f1f5f9; font-weight: bold; border-top: 2px solid #0f172a;">
@@ -1256,7 +1440,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
           <!-- RINCIAN PESANAN ONLINE DELIVERY -->
           <div style="margin-bottom: 24px;">
             <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-transform: uppercase; border-left: 3.5px solid #4338ca; padding-left: 8px;">
-              Rincian Pesanan Online Delivery AZ GO Selesai (${onlineCount} Pesanan)
+              Rincian Pesanan Online Delivery AZ GO Selesai (${periodShortName} - ${onlineCount} Pesanan)
             </div>
             <table>
               <thead>
@@ -1270,7 +1454,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                 </tr>
               </thead>
               <tbody>
-                ${onlineCompletedOrders.length > 0 ? onlineCompletedOrders.map((o, idx) => `
+                ${onlineOrders.length > 0 ? onlineOrders.map((o, idx) => `
                   <tr>
                     <td class="text-center">${idx + 1}</td>
                     <td class="font-bold font-mono">${o.orderNumber || o.id}</td>
@@ -1339,19 +1523,13 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
   };
 
   const handlePrintZReportThermal = () => {
+    const reportData = getFilteredReportData();
     const storeTitle = currentUser?.fullName || (selectedStoreType === 'FOOD' ? 'Ayam Geprek Sambal Bawang Juara' : 'Az Mart Superstore');
     const storeAddress = currentUser?.phone ? `Hubungi: ${currentUser.phone}` : 'Jl. Merdeka Barat No. 12';
     const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-    const offlineTotal = posSalesHistory.reduce((sum, s) => sum + s.total, 0);
-    const onlineCompletedOrders = orders.filter(o => o.status === 'COMPLETED');
-    const onlineTotal = onlineCompletedOrders.reduce((sum, o) => sum + o.total, 0);
-    const grandTotal = offlineTotal + onlineTotal;
-
-    const cashTotal = posSalesHistory.filter(s => s.payMethod === 'CASH').reduce((sum, s) => sum + s.total, 0);
-    const qrisTotal = posSalesHistory.filter(s => s.payMethod === 'QRIS').reduce((sum, s) => sum + s.total, 0);
-    const debitTotal = posSalesHistory.filter(s => s.payMethod === 'DEBIT').reduce((sum, s) => sum + s.total, 0);
+    const { sales, onlineOrders, offlineTotal, onlineTotal, grandTotal, cashTotal, qrisTotal, debitTotal, periodLabel, periodShortName } = reportData;
 
     const printWindow = window.open('', '_blank', 'width=380,height=600');
     if (!printWindow) {
@@ -1364,7 +1542,7 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Z-Report - ${dateStr}</title>
+        <title>Z-Report-${periodShortName}-${dateStr}</title>
         <style>
           @page { size: 58mm auto; margin: 0; }
           body {
@@ -1392,16 +1570,16 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
           <div class="bold" style="font-size: 13px; text-transform: uppercase;">${storeTitle}</div>
           <div style="font-size: 10px;">${storeAddress}</div>
           <div class="double-divider"></div>
-          <div class="bold" style="font-size: 12px;">*** REKAP HARIAN (Z-REPORT) ***</div>
-          <div style="font-size: 10px;">${dateStr}</div>
+          <div class="bold" style="font-size: 12px;">*** REKAP ${periodShortName.toUpperCase()} (Z-REPORT) ***</div>
+          <div style="font-size: 10px;">${periodLabel}</div>
           <div style="font-size: 10px;">Pukul: ${timeStr} WIB</div>
           <div style="font-size: 10px;">Kasir: ${currentUser?.fullName || 'Kasir Toko'}</div>
         </div>
         <div class="divider"></div>
         <div class="row"><span>Kasir Offline:</span><span class="bold">Rp ${offlineTotal.toLocaleString('id-ID')}</span></div>
-        <div class="row" style="font-size: 10px; color: #555;"><span>- Transaksi:</span><span>${posSalesHistory.length} tx</span></div>
+        <div class="row" style="font-size: 10px; color: #555;"><span>- Transaksi:</span><span>${sales.length} tx</span></div>
         <div class="row"><span>Online AZ GO:</span><span class="bold">Rp ${onlineTotal.toLocaleString('id-ID')}</span></div>
-        <div class="row" style="font-size: 10px; color: #555;"><span>- Pesanan Selesai:</span><span>${onlineCompletedOrders.length} order</span></div>
+        <div class="row" style="font-size: 10px; color: #555;"><span>- Pesanan Selesai:</span><span>${onlineOrders.length} order</span></div>
         <div class="double-divider"></div>
         <div class="row bold" style="font-size: 12px;"><span>TOTAL OMSET:</span><span>Rp ${grandTotal.toLocaleString('id-ID')}</span></div>
         <div class="divider"></div>
@@ -2847,169 +3025,341 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
               )}
 
               {/* ================= SUB-VIEW 2: LAPORAN KEUANGAN TERPADU ================= */}
-              {posSubView === 'REPORTS' && (
-                <div className="space-y-6">
-                  {/* Integrated Report Header */}
-                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block">
-                          Laporan Keuangan Terpadu 1 Pintu
-                        </span>
-                        <h3 className="font-black text-slate-900 text-lg">
-                          Rekap Penjualan Kasir Offline & Pesanan Online AZ GO
-                        </h3>
-                        <p className="text-xs text-slate-400">
-                          Data transaksi real-time per hari ini: {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                        </p>
+              {posSubView === 'REPORTS' && (() => {
+                const filteredReport = getFilteredReportData();
+                return (
+                  <div className="space-y-6">
+                    {/* Integrated Report Header */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block">
+                            Laporan Keuangan Terpadu 1 Pintu
+                          </span>
+                          <h3 className="font-black text-slate-900 text-lg">
+                            Rekap Penjualan Kasir Offline & Pesanan Online AZ GO
+                          </h3>
+                          <p className="text-xs text-slate-400">
+                            Data transaksi real-time ({filteredReport.periodLabel})
+                          </p>
+                        </div>
+
+                        {/* Dua Tombol Sejajar: Unduh & Print */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Dropdown Unduh */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenDownloadDropdown(prev => !prev);
+                                setOpenPrintDropdown(false);
+                              }}
+                              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs flex items-center gap-1.5 shadow-sm transition active:scale-[0.98]"
+                              title="Unduh laporan dalam format Excel atau PDF"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Unduh</span>
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openDownloadDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {openDownloadDropdown && (
+                              <>
+                                <div className="fixed inset-0 z-20" onClick={() => setOpenDownloadDropdown(false)} />
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-30 animate-in fade-in zoom-in-95 duration-150 space-y-1">
+                                  <div className="px-3 py-1.5 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100">
+                                    Format Unduhan ({filteredReport.periodShortName})
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenDownloadDropdown(false); handleDownloadExcelReport(); }}
+                                    className="w-full text-left p-2.5 rounded-xl hover:bg-emerald-50 text-slate-800 hover:text-emerald-900 flex items-center gap-2.5 transition text-xs font-bold"
+                                  >
+                                    <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                                      <FileSpreadsheet className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <span className="block leading-tight font-black">Format Excel (.xls)</span>
+                                      <span className="text-[10px] text-slate-400 font-normal">Spreadsheet tabel lengkap</span>
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenDownloadDropdown(false); handlePrintDocumentReport('A4', 'pdf'); }}
+                                    className="w-full text-left p-2.5 rounded-xl hover:bg-indigo-50 text-slate-800 hover:text-indigo-900 flex items-center gap-2.5 transition text-xs font-bold"
+                                  >
+                                    <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+                                      <FileText className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <span className="block leading-tight font-black">Format PDF (Kertas A4)</span>
+                                      <span className="text-[10px] text-slate-400 font-normal">Standar dokumen 210 x 297 mm</span>
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenDownloadDropdown(false); handlePrintDocumentReport('F4', 'pdf'); }}
+                                    className="w-full text-left p-2.5 rounded-xl hover:bg-blue-50 text-slate-800 hover:text-blue-900 flex items-center gap-2.5 transition text-xs font-bold"
+                                  >
+                                    <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
+                                      <FileText className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <span className="block leading-tight font-black">Format PDF (Kertas F4 / Folio)</span>
+                                      <span className="text-[10px] text-slate-400 font-normal">Kertas panjang 215 x 330 mm</span>
+                                    </div>
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Dropdown Print */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenPrintDropdown(prev => !prev);
+                                setOpenDownloadDropdown(false);
+                              }}
+                              className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl text-xs flex items-center gap-1.5 shadow-sm transition active:scale-[0.98]"
+                              title="Pilih ukuran kertas cetak laporan"
+                            >
+                              <Printer className="w-4 h-4 text-emerald-400" />
+                              <span>Print</span>
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openPrintDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {openPrintDropdown && (
+                              <>
+                                <div className="fixed inset-0 z-20" onClick={() => setOpenPrintDropdown(false)} />
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-30 animate-in fade-in zoom-in-95 duration-150 space-y-1">
+                                  <div className="px-3 py-1.5 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100">
+                                    Pilihan Ukuran Cetak ({filteredReport.periodShortName})
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenPrintDropdown(false); handlePrintDocumentReport('A4', 'print'); }}
+                                    className="w-full text-left p-2.5 rounded-xl hover:bg-slate-100 text-slate-800 flex items-center gap-2.5 transition text-xs font-bold"
+                                  >
+                                    <div className="p-1.5 bg-slate-100 text-emerald-600 rounded-lg">
+                                      <Printer className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <span className="block leading-tight font-black">Print Ukuran A4</span>
+                                      <span className="text-[10px] text-slate-400 font-normal">Kertas kantor (210 x 297 mm)</span>
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenPrintDropdown(false); handlePrintDocumentReport('F4', 'print'); }}
+                                    className="w-full text-left p-2.5 rounded-xl hover:bg-slate-100 text-slate-800 flex items-center gap-2.5 transition text-xs font-bold"
+                                  >
+                                    <div className="p-1.5 bg-slate-100 text-blue-600 rounded-lg">
+                                      <Printer className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <span className="block leading-tight font-black">Print Ukuran F4 / Folio</span>
+                                      <span className="text-[10px] text-slate-400 font-normal">Kertas panjang (215 x 330 mm)</span>
+                                    </div>
+                                  </button>
+                                  <div className="border-t border-slate-100 my-1"></div>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenPrintDropdown(false); handlePrintZReportThermal(); }}
+                                    className="w-full text-left p-2.5 rounded-xl hover:bg-slate-100 text-slate-800 flex items-center gap-2.5 transition text-xs font-bold"
+                                  >
+                                    <div className="p-1.5 bg-slate-100 text-slate-600 rounded-lg">
+                                      <Receipt className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <span className="block leading-tight font-black">Struk Mini Thermal (58mm)</span>
+                                      <span className="text-[10px] text-slate-400 font-normal">Z-Report printer Bluetooth</span>
+                                    </div>
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Action Buttons: Unduh Excel, Unduh PDF, Cetak A4 / F4 */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleDownloadExcelReport}
-                          className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-[0.98]"
-                          title="Unduh laporan dalam format spreadsheet Microsoft Excel"
-                        >
-                          <FileSpreadsheet className="w-4 h-4" />
-                          <span>Unduh Excel (.xls)</span>
-                        </button>
+                      {/* Filter Periode Laporan: Harian, Bulanan, Tahunan */}
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-3 border-t border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5 shrink-0">
+                            <Calendar className="w-4 h-4 text-emerald-600" />
+                            Pilih Periode:
+                          </span>
+                          <div className="bg-slate-100 p-1 rounded-2xl flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setReportPeriod('DAILY')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                                reportPeriod === 'DAILY' ? 'bg-white text-emerald-800 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              <span>Harian</span>
+                              {reportPeriod === 'DAILY' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setReportPeriod('MONTHLY')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                                reportPeriod === 'MONTHLY' ? 'bg-white text-emerald-800 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              <span>Bulanan</span>
+                              {reportPeriod === 'MONTHLY' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setReportPeriod('YEARLY')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                                reportPeriod === 'YEARLY' ? 'bg-white text-emerald-800 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              <span>Tahunan</span>
+                              {reportPeriod === 'YEARLY' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                            </button>
+                          </div>
+                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handlePrintDocumentReport('A4', 'pdf')}
-                          className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-[0.98]"
-                          title="Unduh laporan dalam format PDF resmi (A4)"
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Unduh PDF (A4)</span>
-                        </button>
+                        <div className="text-xs text-slate-500 font-medium">
+                          {reportPeriod === 'DAILY' && (
+                            <span>📅 Rekap Transaksi: <strong>Hari Ini ({new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })})</strong></span>
+                          )}
+                          {reportPeriod === 'MONTHLY' && (
+                            <span>📆 Rekap Transaksi: <strong>Bulan Ini ({new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })})</strong></span>
+                          )}
+                          {reportPeriod === 'YEARLY' && (
+                            <span>📊 Akumulasi Transaksi: <strong>Tahun Ini (Tahun {new Date().getFullYear()})</strong></span>
+                          )}
+                        </div>
+                      </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setShowReportExportModal(true)}
-                          className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-[0.98]"
-                          title="Buka pilihan ukuran cetak (A4 / F4 / PDF / Thermal)"
-                        >
-                          <Printer className="w-4 h-4 text-emerald-400" />
-                          <span>Print Laporan (A4 / F4)...</span>
-                        </button>
+                      {/* Integrated KPI Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                        {/* 1. Offline POS Sales */}
+                        <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-1">
+                          <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                            <Receipt className="w-4 h-4 text-emerald-600" /> Penjualan Kasir Offline (POS)
+                          </span>
+                          <p className="text-2xl font-black text-emerald-950">
+                            Rp {filteredReport.offlineTotal.toLocaleString('id-ID')}
+                          </p>
+                          <span className="text-[11px] text-emerald-700 font-medium block">
+                            Total {filteredReport.sales.length} transaksi kasir toko ({filteredReport.periodShortName})
+                          </span>
+                        </div>
+
+                        {/* 2. Online AZGO Orders */}
+                        <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-200 space-y-1">
+                          <span className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+                            <ChefHat className="w-4 h-4 text-indigo-600" /> Pesanan Online AZ GO Delivery
+                          </span>
+                          <p className="text-2xl font-black text-indigo-950">
+                            Rp {filteredReport.onlineTotal.toLocaleString('id-ID')}
+                          </p>
+                          <span className="text-[11px] text-indigo-700 font-medium block">
+                            Total {filteredReport.onlineOrders.length} pesanan online selesai ({filteredReport.periodShortName})
+                          </span>
+                        </div>
+
+                        {/* 3. Combined Total */}
+                        <div className="p-4 bg-gradient-to-br from-slate-900 to-emerald-950 text-white rounded-2xl border border-slate-800 space-y-1 shadow-md">
+                          <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4 text-emerald-400" /> TOTAL OMSET BERSIH TOKO
+                          </span>
+                          <p className="text-2xl font-black text-white">
+                            Rp {filteredReport.grandTotal.toLocaleString('id-ID')}
+                          </p>
+                          <span className="text-[11px] text-slate-300 font-medium block">
+                            Gabungan offline kasir + online delivery ({filteredReport.periodShortName})
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Integrated KPI Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                      {/* 1. Offline POS Sales */}
-                      <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-1">
-                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
-                          <Receipt className="w-4 h-4 text-emerald-600" /> Penjualan Kasir Offline (POS)
-                        </span>
-                        <p className="text-2xl font-black text-emerald-950">
-                          Rp {posSalesHistory.reduce((sum, s) => sum + s.total, 0).toLocaleString('id-ID')}
-                        </p>
-                        <span className="text-[11px] text-emerald-700 font-medium block">
-                          Total {posSalesHistory.length} transaksi kasir toko
+                    {/* Riwayat Struk POS Berdasarkan Periode */}
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                          <History className="w-4 h-4 text-emerald-600" />
+                          Riwayat Transaksi Kasir Toko ({filteredReport.periodShortName}) - {filteredReport.sales.length} Transaksi
+                        </h4>
+                        <span className="text-xs text-slate-400 font-medium">
+                          {filteredReport.periodLabel}
                         </span>
                       </div>
 
-                      {/* 2. Online AZGO Orders */}
-                      <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-200 space-y-1">
-                        <span className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
-                          <ChefHat className="w-4 h-4 text-indigo-600" /> Pesanan Online AZ GO Delivery
-                        </span>
-                        <p className="text-2xl font-black text-indigo-950">
-                          Rp {orders.filter(o => o.status === 'COMPLETED').reduce((sum, o) => sum + o.total, 0).toLocaleString('id-ID')}
-                        </p>
-                        <span className="text-[11px] text-indigo-700 font-medium block">
-                          Total {orders.filter(o => o.status === 'COMPLETED').length} pesanan online selesai
-                        </span>
-                      </div>
-
-                      {/* 3. Combined Total */}
-                      <div className="p-4 bg-gradient-to-br from-slate-900 to-emerald-950 text-white rounded-2xl border border-slate-800 space-y-1 shadow-md">
-                        <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                          <Sparkles className="w-4 h-4 text-emerald-400" /> TOTAL OMSET BERSIH TOKO
-                        </span>
-                        <p className="text-2xl font-black text-white">
-                          Rp {(
-                            posSalesHistory.reduce((sum, s) => sum + s.total, 0) +
-                            orders.filter(o => o.status === 'COMPLETED').reduce((sum, o) => sum + o.total, 0)
-                          ).toLocaleString('id-ID')}
-                        </p>
-                        <span className="text-[11px] text-slate-300 font-medium block">
-                          Gabungan offline kasir + online delivery
-                        </span>
-                      </div>
+                      {filteredReport.sales.length === 0 ? (
+                        <div className="py-12 text-center text-slate-400">
+                          <Receipt className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                          <p className="text-sm font-bold text-slate-600">Belum ada transaksi pada periode {filteredReport.periodShortName}</p>
+                          <p className="text-xs text-slate-400 mt-1">Transaksi kasir pada periode ini akan otomatis tercatat di sini</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-slate-400 uppercase font-black text-[10px] tracking-wider border-y border-slate-100">
+                              <tr>
+                                <th className="py-3 px-3">Jam & No. Struk</th>
+                                <th className="py-3 px-3">Tipe / Meja</th>
+                                <th className="py-3 px-3">Pelanggan</th>
+                                <th className="py-3 px-3">Item Pembelian</th>
+                                <th className="py-3 px-3">Metode Bayar</th>
+                                <th className="py-3 px-3 text-right">Total Bayar</th>
+                                <th className="py-3 px-3 text-center">Aksi Struk</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {filteredReport.sales.map(sale => (
+                                <tr key={sale.id} className="hover:bg-slate-50 transition">
+                                  <td className="py-3.5 px-3">
+                                    <span className="font-bold text-slate-900 block font-mono">{sale.receiptNumber}</span>
+                                    <span className="text-[10px] text-slate-400">{sale.dateIso || ''} • {sale.time} WIB</span>
+                                  </td>
+                                  <td className="py-3.5 px-3">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      sale.orderType === 'DINE_IN' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                                    }`}>
+                                      {sale.orderType === 'DINE_IN' ? `Makan (${sale.tableNumber})` : 'Bungkus'}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 px-3 font-medium text-slate-700">
+                                    {sale.customerName || 'Walk-In'}
+                                  </td>
+                                  <td className="py-3.5 px-3 text-slate-600 max-w-xs truncate">
+                                    {sale.items.map((it: any) => `${it.qty}x ${it.name}`).join(', ')}
+                                  </td>
+                                  <td className="py-3.5 px-3">
+                                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700">
+                                      {sale.payMethod}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 px-3 text-right font-black text-slate-900">
+                                    Rp {sale.total.toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="py-3.5 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCompletedPosSale(sale)}
+                                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition"
+                                    >
+                                      <Receipt className="w-3 h-3 text-slate-500" />
+                                      <span>Buka Struk</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Riwayat Struk POS Hari Ini */}
-                  <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
-                    <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                      <History className="w-4 h-4 text-emerald-600" />
-                      Riwayat Transaksi Kasir Toko Hari Ini ({posSalesHistory.length})
-                    </h4>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 text-slate-400 uppercase font-black text-[10px] tracking-wider border-y border-slate-100">
-                          <tr>
-                            <th className="py-3 px-3">Jam & No. Struk</th>
-                            <th className="py-3 px-3">Tipe / Meja</th>
-                            <th className="py-3 px-3">Pelanggan</th>
-                            <th className="py-3 px-3">Item Pembelian</th>
-                            <th className="py-3 px-3">Metode Bayar</th>
-                            <th className="py-3 px-3 text-right">Total Bayar</th>
-                            <th className="py-3 px-3 text-center">Aksi Struk</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {posSalesHistory.map(sale => (
-                            <tr key={sale.id} className="hover:bg-slate-50 transition">
-                              <td className="py-3.5 px-3">
-                                <span className="font-bold text-slate-900 block font-mono">{sale.receiptNumber}</span>
-                                <span className="text-[10px] text-slate-400">{sale.time} WIB</span>
-                              </td>
-                              <td className="py-3.5 px-3">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  sale.orderType === 'DINE_IN' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
-                                }`}>
-                                  {sale.orderType === 'DINE_IN' ? `Makan (${sale.tableNumber})` : 'Bungkus'}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-3 font-medium text-slate-700">
-                                {sale.customerName || 'Walk-In'}
-                              </td>
-                              <td className="py-3.5 px-3 text-slate-600 max-w-xs truncate">
-                                {sale.items.map((it: any) => `${it.qty}x ${it.name}`).join(', ')}
-                              </td>
-                              <td className="py-3.5 px-3">
-                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700">
-                                  {sale.payMethod}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-3 text-right font-black text-slate-900">
-                                Rp {sale.total.toLocaleString('id-ID')}
-                              </td>
-                              <td className="py-3.5 px-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setCompletedPosSale(sale)}
-                                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition"
-                                >
-                                  <Receipt className="w-3 h-3 text-slate-500" />
-                                  <span>Buka Struk</span>
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </div>
