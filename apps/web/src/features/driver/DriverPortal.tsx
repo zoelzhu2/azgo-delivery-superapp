@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { User, WalletTransaction } from '@delivery/shared';
 import { api } from '../../services/apiClient';
 import { GoogleMapsDriverNav } from '../../components/GoogleMapsDriverNav';
+import { OrderReviewModal, CUSTOMER_PRESET_TAGS, MERCHANT_PRESET_TAGS } from '../../components/review/OrderReviewModal';
+import { OrderReviewDisplay } from '../../components/review/OrderReviewDisplay';
+import { OrderReviewRecord } from '@delivery/shared';
 import { 
   Bike, 
   MapPin, 
@@ -20,7 +23,8 @@ import {
   CreditCard,
   AlertTriangle,
   MessageSquare,
-  ShieldAlert
+  ShieldAlert,
+  Star
 } from 'lucide-react';
 
 interface DriverPortalProps {
@@ -116,6 +120,16 @@ export const DriverPortal: React.FC<DriverPortalProps> = ({
   // State Pesanan Aktif yang Sedang Dijalankan
   const [activeOrder, setActiveOrder] = useState<any>(null);
   const [tripStep, setTripStep] = useState<'PICKING_UP' | 'ARRIVED_PICKUP' | 'IN_TRANSIT' | 'COMPLETED'>('PICKING_UP');
+  const [showDriverReviewModal, setShowDriverReviewModal] = useState(false);
+  const [driverOrderReviews, setDriverOrderReviews] = useState<OrderReviewRecord[]>([]);
+
+  useEffect(() => {
+    if (activeOrder?.orderNumber && tripStep === 'COMPLETED') {
+      api.getOrderReviewsByRole(activeOrder.orderNumber, 'DRIVER').then(res => {
+        setDriverOrderReviews(res || []);
+      });
+    }
+  }, [activeOrder?.orderNumber, tripStep]);
 
   // Terima Order Masuk
   const handleAcceptOrder = () => {
@@ -543,33 +557,73 @@ export const DriverPortal: React.FC<DriverPortalProps> = ({
                   <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
-                <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3">
+                <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-4">
                   <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                  <h4 className="font-bold text-emerald-900 text-lg">Order Telah Selesai!</h4>
-                  <p className="text-xs text-emerald-700">
-                    Pendapatan bersih <strong>Rp {activeOrder.fareIncome.toLocaleString('id-ID')}</strong> telah masuk ke dompet Anda setelah potongan komisi {commissionPercent}%.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setActiveOrder(null);
-                      setIncomingOrder({
-                        id: 'ord-live-02',
-                        orderNumber: 'AZC-20260927-4401',
-                        serviceName: '📦 Az Courier (Paket Reguler)',
-                        pickupAddress: 'Bandung Central Drop Point',
-                        dropoffAddress: 'Jl. Dago Atas No. 88',
-                        distanceKm: 5.1,
-                        grossFare: 21000,
-                        commissionCut: 3150,
-                        fareIncome: 17850,
-                        customerName: 'Ahmad Dahlan',
-                        customerPhone: '081244556677'
-                      });
-                    }}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs"
-                  >
-                    Cari Order Berikutnya
-                  </button>
+                  <div>
+                    <h4 className="font-bold text-emerald-900 text-lg">Order Telah Selesai!</h4>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                      Pendapatan bersih <strong>Rp {activeOrder.fareIncome.toLocaleString('id-ID')}</strong> telah masuk ke dompet Anda setelah potongan komisi {commissionPercent}%.
+                    </p>
+                  </div>
+
+                  {/* Ulasan Rating Driver untuk Pelanggan / Toko */}
+                  {driverOrderReviews.length > 0 ? (
+                    <div className="text-left">
+                      <OrderReviewDisplay
+                        reviews={driverOrderReviews}
+                        onEditReview={() => setShowDriverReviewModal(true)}
+                        title="⭐ Ulasan Anda untuk Pelanggan & Toko"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-white rounded-2xl border border-amber-200 text-left space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                          Beri Bintang & Penilaian untuk Pelanggan:
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                          Ulasan Driver
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Bagikan pengalaman Anda tentang pelanggan {activeOrder.customerName || 'Pelanggan'} untuk menjaga reputasi ekosistem AZ GO.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowDriverReviewModal(true)}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-xs"
+                      >
+                        <Star className="w-3.5 h-3.5 fill-slate-950" />
+                        <span>Beri Nilai Pelanggan & Toko Sekarang</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setActiveOrder(null);
+                        setDriverOrderReviews([]);
+                        setIncomingOrder({
+                          id: 'ord-live-02',
+                          orderNumber: 'AZC-20260927-4401',
+                          serviceName: '📦 Az Courier (Paket Reguler)',
+                          pickupAddress: 'Bandung Central Drop Point',
+                          dropoffAddress: 'Jl. Dago Atas No. 88',
+                          distanceKm: 5.1,
+                          grossFare: 21000,
+                          commissionCut: 3150,
+                          fareIncome: 17850,
+                          customerName: 'Ahmad Dahlan',
+                          customerPhone: '081244556677'
+                        });
+                      }}
+                      className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md transition"
+                    >
+                      Cari Order Berikutnya ↗
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -915,6 +969,37 @@ export const DriverPortal: React.FC<DriverPortalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Rating Ulasan Driver */}
+      {activeOrder && (
+        <OrderReviewModal
+          isOpen={showDriverReviewModal}
+          onClose={() => setShowDriverReviewModal(false)}
+          orderNumber={activeOrder.orderNumber}
+          serviceType={activeOrder.serviceName}
+          reviewerRole="DRIVER"
+          reviewerName={driverProfile.name || currentUser?.fullName || 'Mitra Driver'}
+          reviewerId={driverProfile.id || currentUser?.id}
+          existingReviews={driverOrderReviews}
+          onReviewSubmitted={(newRev) => setDriverOrderReviews(newRev)}
+          targets={[
+            {
+              targetType: 'CUSTOMER',
+              targetName: activeOrder.customerName || 'Pelanggan AZ GO',
+              targetRoleLabel: 'Pelanggan Pemesan',
+              avatarIcon: 'CUSTOMER',
+              presetTags: CUSTOMER_PRESET_TAGS
+            },
+            ...(activeOrder.serviceName?.includes('Food') || activeOrder.serviceName?.includes('Mart') ? [{
+              targetType: 'MERCHANT' as const,
+              targetName: activeOrder.pickupAddress || 'Resto / Toko Mitra',
+              targetRoleLabel: 'Resto / Toko Asal',
+              avatarIcon: 'MERCHANT' as const,
+              presetTags: MERCHANT_PRESET_TAGS
+            }] : [])
+          ]}
+        />
       )}
     </div>
   );

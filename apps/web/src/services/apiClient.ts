@@ -1,4 +1,4 @@
-import { UserRole, Voucher, CreateVoucherInput, UpdateVoucherInput, ValidateVoucherResult, PosSubscriptionApplication, PosPricingConfig, DEFAULT_POS_PRICING } from '@delivery/shared';
+import { UserRole, Voucher, CreateVoucherInput, UpdateVoucherInput, ValidateVoucherResult, PosSubscriptionApplication, PosPricingConfig, DEFAULT_POS_PRICING, OrderReviewRecord, OrderReviewSubmission, ReviewerRole } from '@delivery/shared';
 import { 
   MOCK_USERS, 
   MOCK_RESTAURANTS, 
@@ -13,7 +13,8 @@ import {
   MOCK_WITHDRAWALS, 
   MOCK_PARTNER_APPLICATIONS,
   MOCK_POS_SUBSCRIPTIONS,
-  MOCK_VOUCHERS
+  MOCK_VOUCHERS,
+  MOCK_ORDER_REVIEWS
 } from './mockBackend';
 import { getSupabase } from './supabaseClient';
 
@@ -1846,6 +1847,75 @@ export const api = {
       }
 
       return { success: true };
+    });
+  },
+
+  // 17. SISTEM REVIEW & RATING TRANSAKSI MULTI-PARTY (PELANGGAN, DRIVER & RESTO/TOKO)
+  async submitOrderReviews(submission: OrderReviewSubmission): Promise<{ success: boolean; data: OrderReviewRecord[] }> {
+    return safeFetch('/reviews/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(submission)
+    }, () => {
+      const storageKey = isCurrentDemoMode() ? 'azgo_demo_order_reviews' : 'azgo_real_order_reviews';
+      const existingReviews: OrderReviewRecord[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem(storageKey) || 'null') || [...MOCK_ORDER_REVIEWS])
+        : getRealStorage<OrderReviewRecord[]>(storageKey, [...MOCK_ORDER_REVIEWS]);
+
+      const newRecords: OrderReviewRecord[] = submission.reviews.map((rev, index) => ({
+        id: `rev-${Date.now()}-${index}`,
+        orderNumber: submission.orderNumber,
+        serviceType: submission.serviceType,
+        reviewerRole: submission.reviewerRole,
+        reviewerId: submission.reviewerId || 'user-auto',
+        reviewerName: submission.reviewerName,
+        targetType: rev.targetType,
+        targetId: rev.targetId,
+        targetName: rev.targetName,
+        rating: rev.rating,
+        tags: rev.tags || [],
+        comment: rev.comment || '',
+        createdAt: new Date().toISOString()
+      }));
+
+      // Filter out older review by same reviewer role & target for same order
+      const filtered = existingReviews.filter(
+        ex => !(ex.orderNumber === submission.orderNumber && ex.reviewerRole === submission.reviewerRole && newRecords.some(nr => nr.targetType === ex.targetType))
+      );
+
+      const updated = [...newRecords, ...filtered];
+      if (isCurrentDemoMode()) {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } else {
+        setRealStorage(storageKey, updated);
+      }
+
+      return { success: true, data: newRecords };
+    });
+  },
+
+  async getOrderReviews(orderNumber: string): Promise<OrderReviewRecord[]> {
+    return safeFetch(`/reviews/order/${orderNumber}`, undefined, () => {
+      const storageKey = isCurrentDemoMode() ? 'azgo_demo_order_reviews' : 'azgo_real_order_reviews';
+      const existingReviews: OrderReviewRecord[] = isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem(storageKey) || 'null') || [...MOCK_ORDER_REVIEWS])
+        : getRealStorage<OrderReviewRecord[]>(storageKey, [...MOCK_ORDER_REVIEWS]);
+
+      return existingReviews.filter(r => r.orderNumber === orderNumber);
+    });
+  },
+
+  async getOrderReviewsByRole(orderNumber: string, reviewerRole: ReviewerRole): Promise<OrderReviewRecord[]> {
+    const list = await this.getOrderReviews(orderNumber);
+    return list.filter(r => r.reviewerRole === reviewerRole);
+  },
+
+  async getAllOrderReviews(): Promise<OrderReviewRecord[]> {
+    return safeFetch('/reviews/all', undefined, () => {
+      const storageKey = isCurrentDemoMode() ? 'azgo_demo_order_reviews' : 'azgo_real_order_reviews';
+      return isCurrentDemoMode()
+        ? (JSON.parse(localStorage.getItem(storageKey) || 'null') || [...MOCK_ORDER_REVIEWS])
+        : getRealStorage<OrderReviewRecord[]>(storageKey, [...MOCK_ORDER_REVIEWS]);
     });
   }
 };

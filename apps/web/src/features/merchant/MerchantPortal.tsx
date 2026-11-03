@@ -41,8 +41,11 @@ import {
   FileSpreadsheet,
   FileText,
   Download,
-  ChevronDown
+  ChevronDown,
+  Star
 } from 'lucide-react';
+import { OrderReviewModal, DRIVER_PRESET_TAGS, CUSTOMER_PRESET_TAGS } from '../../components/review/OrderReviewModal';
+import { OrderReviewRecord } from '@delivery/shared';
 
 interface MerchantPortalProps {
   onBack: () => void;
@@ -100,6 +103,18 @@ export const MerchantPortal: React.FC<MerchantPortalProps> = ({
   const [reportPeriod, setReportPeriod] = useState<'DAILY' | 'MONTHLY' | 'YEARLY'>('DAILY');
   const [openDownloadDropdown, setOpenDownloadDropdown] = useState(false);
   const [openPrintDropdown, setOpenPrintDropdown] = useState(false);
+  const [selectedReviewOrder, setSelectedReviewOrder] = useState<any | null>(null);
+  const [merchantReviews, setMerchantReviews] = useState<OrderReviewRecord[]>([]);
+
+  useEffect(() => {
+    api.getAllOrderReviews().then(res => {
+      setMerchantReviews(res.filter(r => r.reviewerRole === 'MERCHANT'));
+    });
+  }, []);
+
+  const hasMerchantReviewed = (orderId: string) => {
+    return merchantReviews.some(r => r.orderNumber === orderId || r.orderNumber === `ORD-${orderId}`);
+  };
   const [posSalesHistory, setPosSalesHistory] = useState<any[]>([
     {
       id: 'pos-101',
@@ -2013,9 +2028,23 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
                   )}
 
                   {order.status === 'COMPLETED' && (
-                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                      <CheckCircle2 className="w-4 h-4" /> Pesanan Selesai • Hasil Penjualan Masuk Dompet
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                        <CheckCircle2 className="w-4 h-4" /> Pesanan Selesai • Hasil Penjualan Masuk Dompet
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedReviewOrder(order)}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition ${
+                          hasMerchantReviewed(order.id)
+                            ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-amber-400'
+                        }`}
+                      >
+                        <Star className={`w-3.5 h-3.5 ${hasMerchantReviewed(order.id) ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} />
+                        <span>{hasMerchantReviewed(order.id) ? 'Ulasan Toko Terkirim ⭐' : 'Beri Rating Driver & Pelanggan'}</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -4413,6 +4442,39 @@ _Struk digital ini dibuat otomatis melalui AZGO POS SuperApp._`;
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Rating Ulasan Resto / Toko */}
+      {selectedReviewOrder && (
+        <OrderReviewModal
+          isOpen={!!selectedReviewOrder}
+          onClose={() => setSelectedReviewOrder(null)}
+          orderNumber={selectedReviewOrder.orderNumber || selectedReviewOrder.id}
+          serviceType={selectedReviewOrder.serviceType || 'FOOD'}
+          reviewerRole="MERCHANT"
+          reviewerName={currentUser?.fullName || 'Mitra Toko'}
+          reviewerId={currentUser?.id}
+          existingReviews={merchantReviews.filter(r => r.orderNumber === (selectedReviewOrder.orderNumber || selectedReviewOrder.id))}
+          onReviewSubmitted={(newRevs) => {
+            setMerchantReviews(prev => [...newRevs, ...prev]);
+          }}
+          targets={[
+            {
+              targetType: 'DRIVER',
+              targetName: selectedReviewOrder.driverName || 'Mitra Driver AZ GO',
+              targetRoleLabel: 'Mitra Pengemudi Pengantar',
+              avatarIcon: 'DRIVER',
+              presetTags: DRIVER_PRESET_TAGS
+            },
+            {
+              targetType: 'CUSTOMER',
+              targetName: selectedReviewOrder.customerName || 'Pelanggan Pemesan',
+              targetRoleLabel: 'Pelanggan Pemesan',
+              avatarIcon: 'CUSTOMER',
+              presetTags: CUSTOMER_PRESET_TAGS
+            }
+          ]}
+        />
       )}
     </div>
   );

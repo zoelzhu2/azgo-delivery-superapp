@@ -18,6 +18,10 @@ import {
   FileCheck
 } from 'lucide-react';
 import { GoogleMapsDriverNav } from '../../components/GoogleMapsDriverNav';
+import { OrderReviewModal, DRIVER_PRESET_TAGS, MERCHANT_PRESET_TAGS } from '../../components/review/OrderReviewModal';
+import { OrderReviewDisplay } from '../../components/review/OrderReviewDisplay';
+import { api } from '../../services/apiClient';
+import { OrderReviewRecord } from '@delivery/shared';
 
 export interface CustomerOrderItem {
   name: string;
@@ -67,12 +71,22 @@ export const CustomerOrderTrackingModal: React.FC<CustomerOrderTrackingModalProp
 }) => {
   const [currentStatus, setCurrentStatus] = useState<CustomerOrder['status']>(order?.status || 'PREPARING');
   const [showProofZoom, setShowProofZoom] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [customerReviews, setCustomerReviews] = useState<OrderReviewRecord[]>([]);
 
   useEffect(() => {
     if (order?.status) {
       setCurrentStatus(order.status);
     }
   }, [order?.status, order?.orderNumber]);
+
+  useEffect(() => {
+    if (order?.orderNumber) {
+      api.getOrderReviewsByRole(order.orderNumber, 'CUSTOMER').then(res => {
+        setCustomerReviews(res || []);
+      });
+    }
+  }, [order?.orderNumber, currentStatus]);
 
   if (!isOpen || !order) return null;
 
@@ -228,6 +242,41 @@ export const CustomerOrderTrackingModal: React.FC<CustomerOrderTrackingModalProp
               </button>
             )}
           </div>
+
+          {/* 1B. ULASAN & PENILAIAN BINTANG KETIKA PESANAN SELESAI */}
+          {currentStatus === 'COMPLETED' && (
+            customerReviews.length > 0 ? (
+              <OrderReviewDisplay
+                reviews={customerReviews}
+                onEditReview={() => setShowReviewModal(true)}
+                title="⭐ Ulasan & Bintang Anda untuk Pesanan Ini"
+              />
+            ) : (
+              <div className="p-4 bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-amber-500/5 rounded-2xl border-2 border-amber-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md">
+                    <Star className="w-6 h-6 fill-slate-950" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-sm">
+                      Beri Nilai & Bintang Pesanan Ini ⭐
+                    </h4>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Bagikan pengalaman Anda untuk Driver {defaultDriver.name} {order.merchantName ? `dan Toko ${order.merchantName}` : ''}.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowReviewModal(true)}
+                  className="py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-md transition flex items-center gap-1.5 shrink-0 active:scale-95"
+                >
+                  <Star className="w-3.5 h-3.5 fill-slate-950" />
+                  <span>Beri Rating Sekarang</span>
+                </button>
+              </div>
+            )
+          )}
 
           {/* 2. REAL-TIME GOOGLE MAPS ANIMATED NAVIGATION VIEW */}
           <div className="space-y-1.5">
@@ -479,6 +528,35 @@ export const CustomerOrderTrackingModal: React.FC<CustomerOrderTrackingModalProp
           </div>
         </div>
       )}
+
+      {/* Modal Rating & Ulasan Pelanggan */}
+      <OrderReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        orderNumber={order.orderNumber}
+        serviceType={order.serviceType}
+        reviewerRole="CUSTOMER"
+        reviewerName={order.customerName || 'Pelanggan AZ GO'}
+        reviewerId="cust-current"
+        existingReviews={customerReviews}
+        onReviewSubmitted={(newRev) => setCustomerReviews(newRev)}
+        targets={[
+          {
+            targetType: 'DRIVER',
+            targetName: defaultDriver.name,
+            targetRoleLabel: 'Mitra Pengemudi (Driver)',
+            avatarIcon: 'DRIVER',
+            presetTags: DRIVER_PRESET_TAGS
+          },
+          ...(order.merchantName || isFoodOrMart ? [{
+            targetType: 'MERCHANT' as const,
+            targetName: order.merchantName || 'Mitra Toko / Resto',
+            targetRoleLabel: 'Mitra Resto / Toko',
+            avatarIcon: 'MERCHANT' as const,
+            presetTags: MERCHANT_PRESET_TAGS
+          }] : [])
+        ]}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { User, Voucher } from '@delivery/shared';
+import { User, Voucher, OrderReviewRecord } from '@delivery/shared';
 
 // 1. Akun Pengguna Mock
 export const MOCK_USERS: (User & { passwordHash: string })[] = [
@@ -508,4 +508,69 @@ export const MOCK_VOUCHERS: Voucher[] = [
     createdAt: new Date(Date.now() - 14 * 86400000).toISOString()
   }
 ];
+
+// 17. Ulasan & Rating Pesanan Mock (Customer, Driver, Resto/Toko)
+export const MOCK_ORDER_REVIEWS: OrderReviewRecord[] = [
+  {
+    id: 'rev-init-1',
+    orderNumber: 'AZD-894215',
+    serviceType: 'FOOD',
+    reviewerRole: 'CUSTOMER',
+    reviewerId: 'usr-cust-1',
+    reviewerName: 'Siti Rahma',
+    targetType: 'DRIVER',
+    targetId: 'usr-drv-1',
+    targetName: 'Rudi Hartono',
+    rating: 5,
+    tags: ['🌟 Sangat Ramah & Sopan', '⚡ Pengantaran Cepat & Tepat Waktu', '📦 Paket / Makanan Terjaga Rapi'],
+    comment: 'Driver sangat ramah, makanan sampai dalam kondisi hangat dan tidak tumpah sama sekali. Mantap!',
+    createdAt: new Date(Date.now() - 3600000).toISOString()
+  },
+  {
+    id: 'rev-init-2',
+    orderNumber: 'AZD-894215',
+    serviceType: 'FOOD',
+    reviewerRole: 'CUSTOMER',
+    reviewerId: 'usr-cust-1',
+    reviewerName: 'Siti Rahma',
+    targetType: 'MERCHANT',
+    targetId: 'mch-1',
+    targetName: 'Ayam Geprek Juara Surabaya',
+    rating: 5,
+    tags: ['😋 Rasa Sangat Lezat & Mantap', '🍱 Porsi Melimpah & Sesuai', '🛍️ Kemasan Rapi & Higienis'],
+    comment: 'Ayam gepreknya pedas mantap nampol, sambal korek juara! Porsi nasinya juga banyak.',
+    createdAt: new Date(Date.now() - 3600000).toISOString()
+  },
+  {
+    id: 'rev-init-3',
+    orderNumber: 'AZD-894215',
+    serviceType: 'FOOD',
+    reviewerRole: 'DRIVER',
+    reviewerId: 'usr-drv-1',
+    reviewerName: 'Rudi Hartono (Driver)',
+    targetType: 'CUSTOMER',
+    targetId: 'usr-cust-1',
+    targetName: 'Siti Rahma',
+    rating: 5,
+    tags: ['👍 Pelanggan Sangat Ramah', '📍 Titik Lokasi Sangat Akurat', '💵 Pembayaran Lancar'],
+    comment: 'Titik antar presisi dan pelanggan langsung keluar saat dihubungi. Terima kasih!',
+    createdAt: new Date(Date.now() - 3000000).toISOString()
+  },
+  {
+    id: 'rev-init-4',
+    orderNumber: 'AZD-894215',
+    serviceType: 'FOOD',
+    reviewerRole: 'MERCHANT',
+    reviewerId: 'mch-1',
+    reviewerName: 'Ayam Geprek Juara',
+    targetType: 'DRIVER',
+    targetId: 'usr-drv-1',
+    targetName: 'Rudi Hartono (Driver)',
+    rating: 5,
+    tags: ['⚡ Cepat Ambil Pesanan', '🎒 Membawa Tas Thermal / Box', '🌟 Sangat Ramah & Sopan'],
+    comment: 'Driver datang tepat waktu dan membawa kantong termal makanan dengan rapi.',
+    createdAt: new Date(Date.now() - 2500000).toISOString()
+  }
+];
+
 

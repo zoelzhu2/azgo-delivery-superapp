@@ -16,7 +16,8 @@ import {
   VoucherServiceScope,
   CreateVoucherInput,
   PosPricingConfig,
-  DEFAULT_POS_PRICING
+  DEFAULT_POS_PRICING,
+  OrderReviewRecord
 } from '@delivery/shared';
 import { 
   Sliders, 
@@ -55,7 +56,10 @@ import {
   Wand2,
   Edit3,
   Search,
-  Copy
+  Copy,
+  Star,
+  MessageSquare,
+  RefreshCw
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -75,7 +79,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onServicesUpdated,
   isDemoMode = false
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'pricing' | 'drivers' | 'merchants' | 'hubs' | 'users' | 'partners' | 'finance' | 'services' | 'qris' | 'pos-subscriptions' | 'vouchers'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'pricing' | 'drivers' | 'merchants' | 'hubs' | 'users' | 'partners' | 'finance' | 'services' | 'qris' | 'pos-subscriptions' | 'vouchers' | 'reviews'>('orders');
+  const [allReviews, setAllReviews] = useState<OrderReviewRecord[]>([]);
+  const [reviewFilterRole, setReviewFilterRole] = useState<'ALL' | 'CUSTOMER' | 'DRIVER' | 'MERCHANT'>('ALL');
+  const [reviewSearchQuery, setReviewSearchQuery] = useState('');
   const [metrics, setMetrics] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [serviceFilter, setServiceFilter] = useState('ALL');
@@ -201,7 +208,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Fetch Initial Data
   const loadData = async () => {
     try {
-      const [mRes, oRes, pRes, dRes, merchRes, hRes, uRes, partRes, finRes, commRes, wRes, srvRes, posRes, vchRes] = await Promise.all([
+      const [mRes, oRes, pRes, dRes, merchRes, hRes, uRes, partRes, finRes, commRes, wRes, srvRes, posRes, vchRes, revRes] = await Promise.all([
         api.getAdminMetrics(),
         api.getAdminOrders(serviceFilter),
         api.getAdminPricing(),
@@ -215,7 +222,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         api.getWithdrawalRequests(),
         api.getAdminServices(),
         api.getPosSubscriptions(),
-        api.getVouchers()
+        api.getVouchers(),
+        api.getAllOrderReviews()
       ]);
       if (mRes.success) setMetrics(mRes.data);
       if (oRes.success) setOrders(oRes.data);
@@ -231,6 +239,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (srvRes?.success) setServices(srvRes.data);
       if (posRes?.success && posRes.data) setPosSubscriptions(posRes.data);
       if (vchRes?.success && Array.isArray(vchRes.data)) setVouchers(vchRes.data);
+      if (Array.isArray(revRes)) setAllReviews(revRes);
     } catch (err) {
       console.error(err);
     }
@@ -1144,6 +1153,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <Tag className="w-4 h-4 text-amber-400" /> Voucher & Promo ({vouchers.filter(v => v.isActive).length}/{vouchers.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('reviews')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            activeTab === 'reviews' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> Rating & Ulasan ({allReviews.length})
         </button>
       </div>
 
@@ -3311,6 +3329,345 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="font-extrabold text-slate-800 text-sm">Belum Ada Voucher Promo</p>
                   <p className="text-xs text-slate-400">
                     Klik tombol "Tambah Voucher Baru" atau gunakan salah satu preset otomatis di atas untuk membuat promo pertama Anda.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= TAB 13: REPUTASI & ULASAN 3 ARAH (PELANGGAN, DRIVER, TOKO) ================= */}
+      {activeTab === 'reviews' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+            <div className="absolute -right-8 -top-8 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-bold mb-3 border border-white/20">
+                  <Star className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                  <span>Sistem Reputasi Terpadu 3-Arah</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                  Pusat Rating & Ulasan Ekosistem AZ GO
+                </h2>
+                <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-2xl font-medium leading-relaxed">
+                  Transparansi kualitas layanan: evaluasi performa Mitra Pengemudi, kepuasan pesanan Mitra Resto & Mart, serta catatan penilaian pelanggan setelah setiap transaksi selesai.
+                </p>
+              </div>
+
+              <div className="shrink-0 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadData}
+                  className="px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 border border-white/20 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Segarkan Data</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI CARDS REPUTASI */}
+          {(() => {
+            const driverReviews = allReviews.filter(r => r.targetType === 'DRIVER');
+            const merchantReviews = allReviews.filter(r => r.targetType === 'MERCHANT');
+            const customerReviews = allReviews.filter(r => r.targetType === 'CUSTOMER');
+
+            const avgDriver = driverReviews.length > 0
+              ? (driverReviews.reduce((acc, r) => acc + r.rating, 0) / driverReviews.length).toFixed(1)
+              : '5.0';
+            const avgMerchant = merchantReviews.length > 0
+              ? (merchantReviews.reduce((acc, r) => acc + r.rating, 0) / merchantReviews.length).toFixed(1)
+              : '5.0';
+            const avgCustomer = customerReviews.length > 0
+              ? (customerReviews.reduce((acc, r) => acc + r.rating, 0) / customerReviews.length).toFixed(1)
+              : '5.0';
+
+            const perfectScoreCount = allReviews.filter(r => r.rating === 5).length;
+            const perfectScorePercent = allReviews.length > 0
+              ? Math.round((perfectScoreCount / allReviews.length) * 100)
+              : 100;
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider block">Rating Driver</span>
+                    <Bike className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-slate-900">{avgDriver}</span>
+                    <span className="text-xs font-bold text-amber-500">/ 5.0</span>
+                    <div className="flex items-center text-amber-400">
+                      <Star className="w-4 h-4 fill-amber-400" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">Dari {driverReviews.length} penilaian pengemudi</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider block">Rating Toko / Resto</span>
+                    <Store className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-slate-900">{avgMerchant}</span>
+                    <span className="text-xs font-bold text-rose-500">/ 5.0</span>
+                    <div className="flex items-center text-amber-400">
+                      <Star className="w-4 h-4 fill-amber-400" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">Dari {merchantReviews.length} ulasan resto/mart</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">Rating Pelanggan</span>
+                    <UserCheck className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-slate-900">{avgCustomer}</span>
+                    <span className="text-xs font-bold text-blue-500">/ 5.0</span>
+                    <div className="flex items-center text-amber-400">
+                      <Star className="w-4 h-4 fill-amber-400" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">Dari {customerReviews.length} ulasan buyer</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">Total Ulasan Masuk</span>
+                    <MessageSquare className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-3xl font-black text-emerald-700">
+                    {allReviews.length}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">{perfectScorePercent}% mendapat bintang 5 sempurna</p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* TABEL & FILTER ULASAN */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-100">
+              {/* Role Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setReviewFilterRole('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    reviewFilterRole === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Semua ({allReviews.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilterRole('CUSTOMER')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex items-center gap-1 cursor-pointer ${
+                    reviewFilterRole === 'CUSTOMER'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>Dari Pelanggan</span>
+                  <span className="text-[10px] opacity-80">({allReviews.filter(r => r.reviewerRole === 'CUSTOMER').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilterRole('DRIVER')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex items-center gap-1 cursor-pointer ${
+                    reviewFilterRole === 'DRIVER'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>Dari Driver</span>
+                  <span className="text-[10px] opacity-80">({allReviews.filter(r => r.reviewerRole === 'DRIVER').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilterRole('MERCHANT')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex items-center gap-1 cursor-pointer ${
+                    reviewFilterRole === 'MERCHANT'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>Dari Toko / Resto</span>
+                  <span className="text-[10px] opacity-80">({allReviews.filter(r => r.reviewerRole === 'MERCHANT').length})</span>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari no pesanan, nama, ulasan..."
+                  value={reviewSearchQuery}
+                  onChange={e => setReviewSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+              </div>
+            </div>
+
+            {/* List Review Content */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider font-extrabold bg-slate-50/50">
+                    <th className="py-3 px-4 rounded-l-2xl">Pesanan & Waktu</th>
+                    <th className="py-3 px-3">Penilai</th>
+                    <th className="py-3 px-3">Pihak Dinilai</th>
+                    <th className="py-3 px-3">Rating</th>
+                    <th className="py-3 px-3">Tag Feedback</th>
+                    <th className="py-3 px-4 rounded-r-2xl">Komentar / Ulasan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {allReviews
+                    .filter(r => {
+                      if (reviewFilterRole !== 'ALL' && r.reviewerRole !== reviewFilterRole) {
+                        return false;
+                      }
+                      if (reviewSearchQuery.trim()) {
+                        const q = reviewSearchQuery.toLowerCase();
+                        const matchOrder = r.orderNumber.toLowerCase().includes(q);
+                        const matchReviewer = r.reviewerName.toLowerCase().includes(q);
+                        const matchTarget = r.targetName.toLowerCase().includes(q);
+                        const matchComment = (r.comment || '').toLowerCase().includes(q);
+                        const matchTags = r.tags.some(t => t.toLowerCase().includes(q));
+                        if (!matchOrder && !matchReviewer && !matchTarget && !matchComment && !matchTags) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    })
+                    .map(r => {
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50/70 transition">
+                          {/* Order & Time */}
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-0.5">
+                              <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                                {r.orderNumber}
+                              </span>
+                              {r.serviceType && (
+                                <span className="text-[10px] font-bold text-rose-600 block">
+                                  {r.serviceType}
+                                </span>
+                              )}
+                              <p className="text-[10px] text-slate-400">
+                                {new Date(r.createdAt).toLocaleString('id-ID', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Penilai */}
+                          <td className="py-3.5 px-3">
+                            <div className="space-y-1">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                r.reviewerRole === 'CUSTOMER'
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : r.reviewerRole === 'DRIVER'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}>
+                                {r.reviewerRole === 'CUSTOMER' ? 'Pelanggan' : r.reviewerRole === 'DRIVER' ? 'Mitra Driver' : 'Mitra Toko'}
+                              </span>
+                              <p className="font-bold text-slate-900 text-xs">{r.reviewerName}</p>
+                            </div>
+                          </td>
+
+                          {/* Pihak Dinilai */}
+                          <td className="py-3.5 px-3">
+                            <div className="space-y-1">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                r.targetType === 'DRIVER'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : r.targetType === 'MERCHANT'
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              }`}>
+                                {r.targetType === 'DRIVER' ? 'Mitra Driver' : r.targetType === 'MERCHANT' ? 'Mitra Resto/Toko' : 'Pelanggan'}
+                              </span>
+                              <p className="font-bold text-slate-800 text-xs">{r.targetName}</p>
+                            </div>
+                          </td>
+
+                          {/* Rating Bintang */}
+                          <td className="py-3.5 px-3">
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex items-center text-amber-400">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                  <Star
+                                    key={star}
+                                    className={`w-3.5 h-3.5 ${
+                                      star <= r.rating
+                                        ? 'text-amber-400 fill-amber-400'
+                                        : 'text-slate-200'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="font-black text-slate-900 text-xs">{r.rating}.0</span>
+                            </div>
+                          </td>
+
+                          {/* Tag Feedback */}
+                          <td className="py-3.5 px-3">
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {r.tags && r.tags.length > 0 ? (
+                                r.tags.map((tag, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-medium"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-slate-400 text-[10px] italic">-</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Komentar */}
+                          <td className="py-3.5 px-4">
+                            {r.comment ? (
+                              <p className="text-slate-700 font-medium italic text-xs max-w-xs sm:max-w-sm line-clamp-3">
+                                "{r.comment}"
+                              </p>
+                            ) : (
+                              <span className="text-slate-400 text-[11px] italic">Tidak ada catatan ulasan</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+
+              {allReviews.length === 0 && (
+                <div className="p-12 text-center space-y-3">
+                  <Star className="w-12 h-12 text-amber-300 mx-auto fill-amber-100" />
+                  <p className="font-extrabold text-slate-800 text-sm">Belum Ada Ulasan Transaksi</p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Ulasan bintang akan otomatis muncul di sini setiap kali Pelanggan, Mitra Pengemudi, atau Mitra Toko memberikan penilaian setelah pesanan diselesaikan.
                   </p>
                 </div>
               )}

@@ -7,3 +7,4 @@ export * from './types/partner';
 export * from './types/finance';
 export * from './types/payment';
 export * from './types/voucher';
+export * from './types/review';
