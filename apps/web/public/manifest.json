@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "name": "AZ GO — Antar Cepat, Kirim Mudah",
+  "short_name": "AZ GO",
+  "description": "SuperApp Pengantaran Makanan, Belanja Mart, Ekspedisi Kurir, dan Aplikasi Kasir POS Toko.",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "window-controls-overlay"],
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "lang": "id-ID",
+  "dir": "ltr",
+  "categories": ["food", "shopping", "business", "finance", "productivity", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pesan Kuliner (Az Food)",
+      "short_name": "Az Food",
+      "description": "Pesan makanan & minuman cepat sampai",
+      "url": "/?service=food",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Belanja Mart (Az Mart)",
+      "short_name": "Az Mart",
+      "description": "Belanja kebutuhan pokok dan harian",
+      "url": "/?service=mart",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ekspedisi & Kurir",
+      "short_name": "Ekspedisi",
+      "description": "Kirim paket kilat & ekspedisi cargo",
+      "url": "/?service=expedition",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Kasir POS & Laporan Toko",
+      "short_name": "Kasir Toko",
+      "description": "Kelola transaksi kasir offline & online",
+      "url": "/?portal=merchant",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

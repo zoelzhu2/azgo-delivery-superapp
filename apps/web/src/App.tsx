@@ -17,6 +17,7 @@ import { ChangePasswordModal } from './features/auth/ChangePasswordModal';
 import { PartnerRegistrationModal } from './features/partner/PartnerRegistrationModal';
 import { CustomerOrderTrackingModal, CustomerOrder } from './features/customer/CustomerOrderTrackingModal';
 import { DemoBanner } from './components/DemoBanner';
+import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
 
 const DEFAULT_DEMO_ORDERS: CustomerOrder[] = [
   {
@@ -717,6 +718,9 @@ export const App: React.FC = () => {
           }
         }}
       />
+
+      {/* PWA Floating Install Prompt for Android, iOS & Desktop */}
+      <PwaInstallPrompt />
     </div>
   );
 };
